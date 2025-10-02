@@ -1,28 +1,11 @@
-const sequelize = require('../../db');
+const { User } = require('./User');
+const { Notification } = require('./Notification');
 
-
-const User = require('./User');
-const Tenant = require('./Tenant');
-const Property = require('./Property');
-const Local = require('./Local');
-const Lease = require('./Lease');
-const PaymentMode = require('./PaymentMode');
-const Payment = require('./Payment');
-const Document = require('./Document');
-const Expense = require('./Expense');
-const Notification = require('./Notification');
-
+// Define associations
+User.hasMany(Notification, { foreignKey: 'user_id', as: 'notifications' });
+Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
 module.exports = {
-sequelize,
-User,
-Tenant,
-Property,
-Local,
-Lease,
-PaymentMode,
-Payment,
-Document,
-Expense,
-Notification
+  User,
+  Notification
 };
