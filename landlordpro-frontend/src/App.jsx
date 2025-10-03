@@ -1,10 +1,16 @@
+import { RouterProvider } from 'react-router'
 import './App.css'
+import { store } from './store/index'
+import {Provider} from 'react-redux'
+import { router } from './routes/index'
 
 function App() {
 
   return (
     <>
-      <h1 className='text-red-600'>Hello LandLordPro</h1>
+      <Provider store={store}>
+          <RouterProvider router={router}/>
+      </Provider>
     </>
   )
 }
