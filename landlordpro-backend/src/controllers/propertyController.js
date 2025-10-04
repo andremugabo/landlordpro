@@ -4,9 +4,10 @@ const propertyService = require('../services/propertyService');
 exports.createProperty = async (req, res) => {
     try {
         const property = await propertyService.createProperty(req.body);
-        res.status(201).json({ success: true, property });
+        return res.status(201).json({ success: true, property });
     } catch (err) {
-        res.status(400).json({ success: false, message: err.message });
+        // 400 if validation error, 500 for server error
+        return res.status(400).json({ success: false, message: err.message });
     }
 };
 
@@ -15,9 +16,9 @@ exports.getAllProperties = async (req, res) => {
     try {
         const { page = 1, limit = 10 } = req.query;
         const result = await propertyService.getAllProperties(page, limit);
-        res.status(200).json({ success: true, ...result });
+        return res.status(200).json({ success: true, ...result });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -25,9 +26,9 @@ exports.getAllProperties = async (req, res) => {
 exports.getPropertyById = async (req, res) => {
     try {
         const property = await propertyService.getPropertyById(req.params.id);
-        res.status(200).json({ success: true, property });
+        return res.status(200).json({ success: true, property });
     } catch (err) {
-        res.status(404).json({ success: false, message: err.message });
+        return res.status(404).json({ success: false, message: err.message });
     }
 };
 
@@ -35,9 +36,9 @@ exports.getPropertyById = async (req, res) => {
 exports.updateProperty = async (req, res) => {
     try {
         const property = await propertyService.updateProperty(req.params.id, req.body);
-        res.status(200).json({ success: true, property });
+        return res.status(200).json({ success: true, property });
     } catch (err) {
-        res.status(400).json({ success: false, message: err.message });
+        return res.status(400).json({ success: false, message: err.message });
     }
 };
 
@@ -45,8 +46,8 @@ exports.updateProperty = async (req, res) => {
 exports.deleteProperty = async (req, res) => {
     try {
         const result = await propertyService.deleteProperty(req.params.id);
-        res.status(200).json({ success: true, message: result.message });
+        return res.status(200).json({ success: true, message: result.message });
     } catch (err) {
-        res.status(404).json({ success: false, message: err.message });
+        return res.status(404).json({ success: false, message: err.message });
     }
 };

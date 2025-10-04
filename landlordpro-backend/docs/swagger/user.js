@@ -36,7 +36,7 @@
  *                 example: "Password123!"
  *               role:
  *                 type: string
- *                 enum: [admin, user]
+ *                 enum: [admin, manager,employee]
  *                 example: "user"
  *     responses:
  *       201:

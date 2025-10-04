@@ -1,9 +1,10 @@
-const { User, registerSchema, loginSchema, updateSchema, disableSchema } = require('../models/User');
-const { Notification } = require('../models/Notification');
+const { User, Notification } = require('../models');
+const { registerSchema, loginSchema, updateSchema } = require('../models/User'); // adjust if needed
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-// Register a new user
+// --- Auth Services ---
+
 async function registerUser(data) {
     const { error, value } = registerSchema.validate(data);
     if (error) throw new Error(error.details[0].message);
@@ -12,7 +13,6 @@ async function registerUser(data) {
     return await User.create({ ...value, password_hash: hashed });
 }
 
-// Login
 async function loginUser(data) {
     const { error, value } = loginSchema.validate(data);
     if (error) throw new Error(error.details[0].message);
@@ -32,12 +32,19 @@ async function loginUser(data) {
     return { user, token };
 }
 
-// Get all users
-async function getAllUsers() {
-    return await User.findAll({ attributes: { exclude: ['password_hash'] } });
+// --- User Management ---
+
+async function getAllUsers({ page = 1, limit = 10 } = {}) {
+    const offset = (page - 1) * limit;
+    const users = await User.findAndCountAll({
+        attributes: { exclude: ['password_hash'] },
+        limit,
+        offset,
+        order: [['created_at', 'DESC']]
+    });
+    return users;
 }
 
-// Update user by ID
 async function updateUser(id, data) {
     const { error, value } = updateSchema.validate(data);
     if (error) throw new Error(error.details[0].message);
@@ -51,7 +58,6 @@ async function updateUser(id, data) {
         role: value.role
     });
 
-    // Optional: Create notification
     await Notification.create({
         user_id: id,
         message: 'Your account has been updated.',
@@ -61,14 +67,12 @@ async function updateUser(id, data) {
     return user;
 }
 
-// Disable user by ID
 async function disableUser(id) {
     const user = await User.findByPk(id);
     if (!user) throw new Error('User not found');
 
     await user.update({ is_active: false });
 
-    // Optional: Create notification
     await Notification.create({
         user_id: id,
         message: 'Your account has been disabled.',
@@ -78,7 +82,6 @@ async function disableUser(id) {
     return user;
 }
 
-// Enable user by ID (service)
 async function enableUser(id) {
     const user = await User.findByPk(id);
     if (!user) throw new Error('User not found');
@@ -94,14 +97,39 @@ async function enableUser(id) {
     return user;
 }
 
-// Get all notifications (service) - Admin only
-async function getAllNotifications() {
-    return await Notification.findAll({
+// --- Notifications ---
+
+async function getAllNotifications({ page = 1, limit = 10 } = {}) {
+    const offset = (page - 1) * limit;
+    const { count, rows } = await Notification.findAndCountAll({
         include: [{ model: User, as: 'user', attributes: ['id', 'full_name', 'email'] }],
-        order: [['created_at', 'DESC']]
+        order: [['createdAt', 'DESC']],
+        limit,
+        offset
     });
+    return { count, rows };
 }
 
+async function getUnreadNotifications({ userId, page = 1, limit = 10 }) {
+    const offset = (page - 1) * limit;
+    const { count, rows } = await Notification.findAndCountAll({
+        where: { user_id: userId, is_read: false },
+        order: [['createdAt', 'DESC']],
+        limit,
+        offset
+    });
+    return { count, rows };
+}
+
+async function markNotificationRead(id, userId) {
+    const notification = await Notification.findOne({ where: { id, user_id: userId } });
+    if (!notification) throw new Error('Notification not found');
+
+    await notification.update({ is_read: true });
+    return notification;
+}
+
+// --- Export all services ---
 
 module.exports = {
     registerUser,
@@ -110,5 +138,7 @@ module.exports = {
     updateUser,
     disableUser,
     enableUser,
-    getAllNotifications
+    getAllNotifications,
+    getUnreadNotifications,
+    markNotificationRead,
 };

@@ -4,7 +4,9 @@ export { default as ForgotPassword } from './authPages/ForgotPassword'
 export { default as ResetPassword } from './authPages/ResetPassword'
 
 // Admin pages
-export { default as AdminDashboard } from './adminPages/AdminDashboard'
+export { default as AdminDashboard } from './adminPages/adminDashboard'
+export { default as AdminUsersPage } from './adminPages/AdminUsersPage'
+export { default as PropertyPage } from './adminPages/PropertyPage'
 
 // Manager pages
 export { default as ManagerDashboard } from './managerPages/ManagerDashboard'
