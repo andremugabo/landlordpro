@@ -1,7 +1,7 @@
 # 🏠 LandlordPro
 
 **LandlordPro** is a full-stack property management system for landlords and tenants.
-It provides tools for managing **properties, tenants, leases, payments, expenses, and notifications** in a modern and scalable way.
+It provides tools for managing **properties, tenants, leases, payments, expenses, and notifications** — all in one modern and scalable platform.
 
 ---
 
@@ -12,7 +12,7 @@ It provides tools for managing **properties, tenants, leases, payments, expenses
 * **Database**: PostgreSQL
 * **Authentication**: JWT (JSON Web Tokens)
 * **Validation**: Joi
-* **API Docs**: Swagger
+* **API Documentation**: Swagger
 
 ---
 
@@ -20,18 +20,19 @@ It provides tools for managing **properties, tenants, leases, payments, expenses
 
 ```
 landlordpro/
-│── backend/               # Node.js + Express backend
+│
+├── backend/               # Node.js + Express backend
 │   ├── src/               # Models, routes, controllers
-│   ├── seeds/             # Seed files
+│   ├── services/          # Business logic and helpers
 │   ├── db.js              # Sequelize DB connection
 │   ├── sync.js            # Sync models with DB
-│   ├── seed.js            # Run seeds
-│   ├── server.js          # Entry point for backend
+│   ├── seed.js            # Run seed data
 │   ├── swagger.js         # Swagger API docs setup
+│   ├── server.js          # Backend entry point
 │   └── package.json
 │
-│── frontend/              # React + Vite frontend
-│   ├── src/               # React components & pages
+├── frontend/              # React + Vite frontend
+│   ├── src/               # Components, pages, and hooks
 │   ├── public/            # Static assets
 │   ├── index.html
 │   └── package.json
@@ -44,16 +45,16 @@ landlordpro/
 
 ## ⚙️ Backend Setup
 
-### 1️⃣ Install dependencies
+### 1️⃣ Install Dependencies
 
 ```bash
 cd backend
 npm install
 ```
 
-### 2️⃣ Configure environment
+### 2️⃣ Configure Environment Variables
 
-Create a `.env` file inside `backend/` with:
+Create a `.env` file inside `/backend`:
 
 ```env
 DB_NAME=landlordpro_db
@@ -61,107 +62,143 @@ DB_USER=postgres
 DB_PASS=123
 DB_HOST=localhost
 DB_PORT=5432
+
 PORT=3000
 
 JWT_SECRET=your_super_secret_key
 JWT_EXPIRES_IN=1h
 ```
 
+---
+
 ### 3️⃣ Sync Database
 
-This will create/update tables based on Sequelize models.
+This will create or update database tables based on your Sequelize models:
 
 ```bash
 npm run sync
 ```
 
+---
+
 ### 4️⃣ Seed Data
 
-This inserts sample data (users, payment modes, etc).
+Seed sample users, payment modes, and default data:
 
 ```bash
 npm run seed
 ```
 
-### 5️⃣ Run Backend
+---
+
+### 5️⃣ Run the Backend
 
 ```bash
-npm run dev   # Runs with nodemon
-# OR
-npm start     # Runs normally
+npm run dev    # Development (with nodemon)
+# or
+npm start      # Production
 ```
+
+Backend will run at:
+👉 **[http://localhost:3000](http://localhost:3000)**
 
 ---
 
 ## 🎨 Frontend Setup
 
-### 1️⃣ Install dependencies
+### 1️⃣ Install Dependencies
 
 ```bash
 cd frontend
 npm install
 ```
 
-### 2️⃣ Configure environment
+### 2️⃣ Configure Environment Variables
 
-Create a `.env` file inside `frontend/` with:
+Create a `.env` file in `/frontend`:
 
 ```env
-VITE_API_BASE_URL=http://localhost:3000/api
+# Base URL for backend API
+VITE_API_BASE_URL=http://localhost:3000
+
+# Optional: environment mode
+VITE_APP_ENV=development
 ```
 
-### 3️⃣ Run Frontend
+For **production**, use:
+
+```env
+VITE_API_BASE_URL=/api
+VITE_APP_ENV=production
+```
+
+✅ This ensures that when deployed, the frontend correctly targets your backend API (e.g., [https://saintmichel.rw/api](https://saintmichel.rw/api)).
+
+---
+
+### 3️⃣ Run the Frontend
 
 ```bash
 npm run dev
 ```
 
-The frontend will be available at: **[http://localhost:5173](http://localhost:5173)**
+Frontend available at:
+👉 **[http://localhost:5173](http://localhost:5173)**
 
 ---
 
 ## 📖 API Documentation
 
-Swagger API docs are available at:
-
-```
-http://localhost:3000/api-docs
-```
+Swagger UI is available at:
+👉 **[http://localhost:3000/api-docs](http://localhost:3000/api-docs)**
 
 ---
 
-## 🛠️ Available NPM Scripts
+## 🛠️ NPM Scripts
 
-### Backend (`/backend`)
+### **Backend (`/backend`)**
 
-* `npm run dev` → Start backend in development mode with nodemon
-* `npm start` → Start backend normally
-* `npm run sync` → Sync database schema
-* `npm run seed` → Run database seeders
+| Script         | Description                              |
+| -------------- | ---------------------------------------- |
+| `npm run dev`  | Start backend with Nodemon (development) |
+| `npm start`    | Start backend normally                   |
+| `npm run sync` | Sync database schema                     |
+| `npm run seed` | Seed database                            |
 
-### Frontend (`/frontend`)
+### **Frontend (`/frontend`)**
 
-* `npm run dev` → Start React app in dev mode
-* `npm run build` → Build production frontend
-* `npm run preview` → Preview production build
+| Script            | Description                 |
+| ----------------- | --------------------------- |
+| `npm run dev`     | Run Vite development server |
+| `npm run build`   | Build production frontend   |
+| `npm run preview` | Preview built frontend      |
 
 ---
 
 ## 🔐 Authentication
 
-* JWT tokens are generated at **login** and must be sent in the `Authorization` header:
+* JWT tokens are issued at login and required for protected routes.
+* Include them in requests like:
 
-  ```
-  Authorization: Bearer <token>
-  ```
-* JWT contains `userId`, `role`, and expiration time.
-* Protected routes validate the token using middleware.
+```
+Authorization: Bearer <token>
+```
+
+Each token contains:
+
+* `userId`
+* `role`
+* `expiration`
+
+Middleware ensures only valid tokens can access protected resources.
 
 ---
 
 ## 🧪 Validation
 
-All incoming requests are validated with **Joi**. Example:
+All incoming requests are validated using **Joi** for data consistency and security.
+
+Example:
 
 ```js
 const Joi = require("joi");
@@ -177,22 +214,17 @@ const registerSchema = Joi.object({
 
 ## 📌 Features
 
-✅ User registration & authentication
-✅ Tenant & lease management
-✅ Property & local (unit) management
-✅ Payment tracking with proof upload
+✅ User authentication & role management (Admin, Landlord, Tenant)
+✅ Tenant and lease tracking
+✅ Property and unit management
+✅ Payment management with proof uploads
 ✅ Expense tracking
-✅ Notifications for payments, leases, documents
-✅ API documentation with Swagger
-✅ React + Vite responsive frontend
+✅ Real-time notifications
+✅ API documentation (Swagger)
+✅ Modern responsive frontend (React + TailwindCSS)
 
 ---
 
-## 🏗️ Future Improvements
 
-* Multi-tenant support for agencies
-* Payment gateway integration (e.g. Stripe, Mobile Money)
-* Automated rent reminders via email/SMS
-* Reporting dashboard with charts
 
 

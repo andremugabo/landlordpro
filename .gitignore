@@ -1,0 +1,88 @@
+# ==========================
+# Node.js / Backend
+# ==========================
+backend/node_modules/
+backend/.env
+backend/.env.local
+backend/.env.development
+backend/.env.production
+backend/public/uploads/
+backend/public/temp/
+backend/dist/
+backend/logs/
+backend/debug.log
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+
+# Sequelize auto-generated files
+backend/src/migrations/
+backend/src/seeders/
+backend/src/models/index.js
+
+# ==========================
+# Frontend / React + Vite
+# ==========================
+frontend/node_modules/
+frontend/.env
+frontend/.env.local
+frontend/.env.development
+frontend/.env.production
+frontend/dist/
+frontend/.vite/
+frontend/.DS_Store
+
+# ==========================
+# System / OS Files
+# ==========================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+.idea/
+.vscode/
+*.swp
+*.swo
+*.log
+
+# ==========================
+# Environment & Secrets
+# ==========================
+.env
+.env.local
+.env.production
+.env.development
+*.pem
+*.key
+*.crt
+
+# ==========================
+# Build / Coverage / Cache
+# ==========================
+coverage/
+dist/
+build/
+.cache/
+tmp/
+temp/
+*.tsbuildinfo
+
+# ==========================
+# PM2 / Logs / PIDs
+# ==========================
+pids/
+*.pid
+*.seed
+*.pid.lock
+pm2.log
+*.log
+logs/
+
+# ==========================
+# Misc
+# ==========================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tgz
+*.zip
