@@ -7,6 +7,40 @@
 
 /**
  * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *           example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+ *         full_name:
+ *           type: string
+ *           example: "John Doe"
+ *         email:
+ *           type: string
+ *           example: "john@example.com"
+ *         role:
+ *           type: string
+ *           enum: [admin, manager, employee]
+ *           example: "user"
+ *         is_active:
+ *           type: boolean
+ *           example: true
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-10-02T14:00:00.000Z"
+ *         updated_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-10-02T14:05:00.000Z"
+ */
+
+/**
+ * @swagger
  * /api/register:
  *   post:
  *     summary: Register a new user (Admins only)
@@ -36,11 +70,20 @@
  *                 example: "Password123!"
  *               role:
  *                 type: string
- *                 enum: [admin, manager,employee]
+ *                 enum: [admin, manager, employee]
  *                 example: "user"
  *     responses:
  *       201:
  *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  *       400:
  *         description: Validation error
  *       401:
@@ -53,7 +96,7 @@
  *   post:
  *     summary: Login a user
  *     tags: [Users]
- *     security: []   
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:
@@ -73,10 +116,18 @@
  *     responses:
  *       200:
  *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 token:
+ *                   type: string
  *       400:
  *         description: Invalid email or password
  */
-
 
 /**
  * @swagger
@@ -89,6 +140,17 @@
  *     responses:
  *       200:
  *         description: List of users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/User'
  *       401:
  *         description: Unauthorized
  */
@@ -117,17 +179,23 @@
  *             properties:
  *               full_name:
  *                 type: string
- *                 example: "John Doe"
  *               email:
  *                 type: string
- *                 example: "john@example.com"
  *               role:
  *                 type: string
  *                 enum: [admin, user, manager]
- *                 example: "user"
  *     responses:
  *       200:
  *         description: User updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  *       400:
  *         description: Validation error
  *       401:
@@ -152,6 +220,15 @@
  *     responses:
  *       200:
  *         description: User disabled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  *       400:
  *         description: Validation error
  *       401:
@@ -162,20 +239,18 @@
  * @swagger
  * /api/users/{id}/enable:
  *   put:
- *     summary: Enable a user account
- *     description: Allows an admin to re-activate a disabled user by setting `is_active` to true.
- *     tags:
- *       - Users
+ *     summary: Enable a user account (Admin only)
+ *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
+ *         description: User ID to enable
  *         schema:
  *           type: string
  *           format: uuid
- *         required: true
- *         description: The UUID of the user to enable
  *     responses:
  *       200:
  *         description: User successfully enabled

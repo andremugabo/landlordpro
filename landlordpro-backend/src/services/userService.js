@@ -1,5 +1,6 @@
-const { User, Notification } = require('../models');
-const { registerSchema, loginSchema, updateSchema } = require('../models/User'); // adjust if needed
+const User = require('../models/User');
+const { registerSchema, loginSchema, updateSchema } = User.schemas;
+const { Notification } = require('../models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
@@ -32,7 +33,7 @@ async function loginUser(data) {
     return { user, token };
 }
 
-// --- User Management ---
+// --- User Management Services ---
 
 async function getAllUsers({ page = 1, limit = 10 } = {}) {
     const offset = (page - 1) * limit;
@@ -52,11 +53,12 @@ async function updateUser(id, data) {
     const user = await User.findByPk(id);
     if (!user) throw new Error('User not found');
 
-    await user.update({
-        full_name: value.full_name,
-        email: value.email,
-        role: value.role
-    });
+    const updates = {};
+    if (value.full_name) updates.full_name = value.full_name;
+    if (value.email) updates.email = value.email;
+    if (value.role) updates.role = value.role;
+
+    await user.update(updates);
 
     await Notification.create({
         user_id: id,
@@ -97,7 +99,7 @@ async function enableUser(id) {
     return user;
 }
 
-// --- Notifications ---
+// --- Notifications Services ---
 
 async function getAllNotifications({ page = 1, limit = 10 } = {}) {
     const offset = (page - 1) * limit;

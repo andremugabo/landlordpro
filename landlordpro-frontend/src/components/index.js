@@ -6,3 +6,4 @@ export { default as Footer} from './ui/footer'
 export { default as Sidebar} from './ui/Sidebar'
 export { default as Topbar} from './ui/Topbar'
 export { default as Modal } from './ui/Modal';
+export { default as Select } from './ui/Select';

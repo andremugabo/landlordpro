@@ -1,0 +1,81 @@
+// leaseService.js
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_BASE_URL + '/api' || '/api';
+
+const leaseService = {
+  getLeases: async (page = 1, limit = 10) => {
+    try {
+      const res = await axios.get(`${API_URL}/leases?page=${page}&limit=${limit}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      return res.data;
+    } catch (err) {
+      console.error('Failed to fetch leases:', err);
+      throw err;
+    }
+  },
+
+  createLease: async (leaseData) => {
+    try {
+      const res = await axios.post(`${API_URL}/leases`, leaseData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      return res.data;
+    } catch (err) {
+      console.error('Failed to create lease:', err);
+      throw err;
+    }
+  },
+
+  updateLease: async (id, leaseData) => {
+    try {
+      const res = await axios.put(`${API_URL}/leases/${id}`, leaseData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      return res.data;
+    } catch (err) {
+      console.error(`Failed to update lease ${id}:`, err);
+      throw err;
+    }
+  },
+
+  deleteLease: async (id) => {
+    try {
+      const res = await axios.delete(`${API_URL}/leases/${id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      return res.data;
+    } catch (err) {
+      console.error(`Failed to delete lease ${id}:`, err);
+      throw err;
+    }
+  },
+
+  downloadPdfReport: async () => {
+    try {
+      const res = await axios.get(`${API_URL}/report/pdf`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `lease_report_${new Date().toISOString().split('T')[0]}.pdf`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download PDF report:', err);
+      throw err;
+    }
+  },
+};
+
+export default leaseService;

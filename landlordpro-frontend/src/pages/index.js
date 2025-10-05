@@ -7,6 +7,9 @@ export { default as ResetPassword } from './authPages/ResetPassword'
 export { default as AdminDashboard } from './adminPages/adminDashboard'
 export { default as AdminUsersPage } from './adminPages/AdminUsersPage'
 export { default as PropertyPage } from './adminPages/PropertyPage'
+export { default as LocalPage } from './adminPages/LocalPage'
+export { default as TenantPage } from './adminPages/TenantPage'
+export { default as LeasePage } from './adminPages/LeasePage'
 
 // Manager pages
 export { default as ManagerDashboard } from './managerPages/ManagerDashboard'

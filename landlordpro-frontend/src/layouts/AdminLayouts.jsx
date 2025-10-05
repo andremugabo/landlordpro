@@ -10,6 +10,7 @@ const adminLinks = [
   { label: 'Dashboard', path: '/admin' },
   { label: 'Users', path: '/admin/adminUsers' },
   { label: 'Properties', path: '/admin/properties' },
+  { label: 'Locals', path: '/admin/locals' },
   { label: 'Tenants', path: '/admin/tenants' },
   { label: 'Leases', path: '/admin/leases' },
   { label: 'Invoices', path: '/admin/invoices' },

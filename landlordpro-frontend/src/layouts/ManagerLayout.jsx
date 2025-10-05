@@ -9,6 +9,7 @@ import 'react-toastify/dist/ReactToastify.css';
 const managerLinks = [
   { label: 'Dashboard', path: '/manager' },
   { label: 'Properties', path: '/manager/properties' },
+  { label: 'Locals', path: '/admin/locals' },
   { label: 'Tenants', path: '/manager/tenants' },
   { label: 'Leases', path: '/manager/leases' },
   { label: 'Payments', path: '/manager/payments' },

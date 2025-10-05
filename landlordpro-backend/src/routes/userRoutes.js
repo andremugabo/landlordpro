@@ -21,4 +21,5 @@ router.put('/notifications/:id/read', authenticate, userController.markNotificat
 // Admin-only: view all notifications across system
 router.get('/notifications/all', authenticate, adminOnly, userController.getAllNotifications);
 
+
 module.exports = router;

@@ -1,8 +1,10 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Model } = require('sequelize');
 const sequelize = require('../../db'); // adjust path
 const Joi = require('joi');
 
-const User = sequelize.define('User', {
+class User extends Model {}
+
+User.init({
   id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
   email: { type: DataTypes.STRING, allowNull: false, unique: true },
   password_hash: { type: DataTypes.STRING, allowNull: false },
@@ -10,7 +12,12 @@ const User = sequelize.define('User', {
   role: { type: DataTypes.ENUM('admin', 'manager', 'employee'), defaultValue: 'user' },
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
   created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
-}, { tableName: 'users', timestamps: false });
+}, {
+  sequelize,
+  modelName: 'User',
+  tableName: 'users',
+  timestamps: false
+});
 
 // Joi Schemas
 const registerSchema = Joi.object({
@@ -35,4 +42,5 @@ const disableSchema = Joi.object({
   id: Joi.string().uuid().required()
 });
 
-module.exports = { User, registerSchema, loginSchema, updateSchema, disableSchema };
+module.exports = User;
+module.exports.schemas = { registerSchema, loginSchema, updateSchema, disableSchema };
