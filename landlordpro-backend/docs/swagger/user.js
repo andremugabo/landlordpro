@@ -109,10 +109,10 @@
  *             properties:
  *               email:
  *                 type: string
- *                 example: "john@example.com"
+ *                 example: "andre@email.com"
  *               password:
  *                 type: string
- *                 example: "Password123!"
+ *                 example: "123456"
  *     responses:
  *       200:
  *         description: Login successful

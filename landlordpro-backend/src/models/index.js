@@ -9,47 +9,37 @@ const PaymentMode = require('./PaymentMode');
 const Document = require('./Document');
 const Expense = require('./Expense');
 
-// 🔗 Associations
+// Associations
 
-// User ↔ Notification
 User.hasMany(Notification, { foreignKey: 'user_id', as: 'notifications' });
 Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
-// Property ↔ Local
-Property.hasMany(Local, { foreignKey: 'property_id', as: 'propertyLocals' });
+Property.hasMany(Local, { foreignKey: 'property_id', as: 'localsForProperty' });
 Local.belongsTo(Property, { foreignKey: 'property_id', as: 'property' });
 
-// Tenant ↔ Lease
-Tenant.hasMany(Lease, { foreignKey: 'tenant_id', as: 'tenantLeases' });
-Lease.belongsTo(Tenant, { foreignKey: 'tenant_id', as: 'leaseTenant' });
+Tenant.hasMany(Lease, { foreignKey: 'tenant_id', as: 'leasesForTenant' });
+Lease.belongsTo(Tenant, { foreignKey: 'tenant_id', as: 'tenantForLease' });
 
-// Local ↔ Lease
-Local.hasMany(Lease, { foreignKey: 'local_id', as: 'localLeases' });
-Lease.belongsTo(Local, { foreignKey: 'local_id', as: 'leaseLocal' });
+Local.hasMany(Lease, { foreignKey: 'local_id', as: 'leasesForLocal' });
+Lease.belongsTo(Local, { foreignKey: 'local_id', as: 'localForLease' });
 
-// Lease ↔ Payment
-Lease.hasMany(Payment, { foreignKey: 'lease_id', as: 'leasePayments' });
-Payment.belongsTo(Lease, { foreignKey: 'lease_id', as: 'paymentLease' });
+Lease.hasMany(Payment, { foreignKey: 'lease_id', as: 'paymentsForLease' });
+Payment.belongsTo(Lease, { foreignKey: 'lease_id', as: 'leaseForPayment' });
 
-// PaymentMode ↔ Payment
-PaymentMode.hasMany(Payment, { foreignKey: 'payment_mode_id', as: 'payments' });
-Payment.belongsTo(PaymentMode, { foreignKey: 'payment_mode_id', as: 'paymentMode' });
+PaymentMode.hasMany(Payment, { foreignKey: 'payment_mode_id', as: 'paymentsByMode' });
+Payment.belongsTo(PaymentMode, { foreignKey: 'payment_mode_id', as: 'paymentModeForPayment' });
 
-// Lease ↔ Document
-Lease.hasMany(Document, { foreignKey: 'lease_id', as: 'leaseDocuments' });
-Document.belongsTo(Lease, { foreignKey: 'lease_id', as: 'documentLease' });
+Lease.hasMany(Document, { foreignKey: 'lease_id', as: 'documentsForLease' });
+Document.belongsTo(Lease, { foreignKey: 'lease_id', as: 'leaseForDocument' });
 
-// Tenant ↔ Document (if applicable)
-Tenant.hasMany(Document, { foreignKey: 'owner_id', as: 'tenantDocuments' });
-Document.belongsTo(Tenant, { foreignKey: 'owner_id', as: 'documentTenant' });
+Tenant.hasMany(Document, { foreignKey: 'owner_id', as: 'documentsForTenant' });
+Document.belongsTo(Tenant, { foreignKey: 'owner_id', as: 'tenantForDocument' });
 
-// Property ↔ Expense
-Property.hasMany(Expense, { foreignKey: 'property_id', as: 'propertyExpenses' });
-Expense.belongsTo(Property, { foreignKey: 'property_id', as: 'expenseProperty' });
+Property.hasMany(Expense, { foreignKey: 'property_id', as: 'expensesForProperty' });
+Expense.belongsTo(Property, { foreignKey: 'property_id', as: 'propertyForExpense' });
 
-// Local ↔ Expense
-Local.hasMany(Expense, { foreignKey: 'local_id', as: 'localExpenses' });
-Expense.belongsTo(Local, { foreignKey: 'local_id', as: 'expenseLocal' });
+Local.hasMany(Expense, { foreignKey: 'local_id', as: 'expensesForLocal' });
+Expense.belongsTo(Local, { foreignKey: 'local_id', as: 'localForExpense' });
 
 module.exports = {
   User,
@@ -61,5 +51,5 @@ module.exports = {
   Payment,
   PaymentMode,
   Document,
-  Expense
+  Expense,
 };

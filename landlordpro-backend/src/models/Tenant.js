@@ -15,10 +15,12 @@ Tenant.init(
     sequelize,
     modelName: 'Tenant',
     tableName: 'tenants',
-    timestamps: true,         // Automatically adds createdAt & updatedAt
-    paranoid: true,           // Enables soft deletes using deletedAt
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    timestamps: true,         
+    paranoid: true, 
+    underscored: true,          
+    deletedAt: 'deleted_at',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at'
   }
 );
 

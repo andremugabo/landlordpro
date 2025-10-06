@@ -24,6 +24,11 @@
  *           type: string
  *           format: date-time
  *           example: "2026-10-05T10:00:00Z"
+ *         leaseAmount:
+ *           type: number
+ *           format: decimal
+ *           example: 750000.00
+ *           description: Monthly lease amount or rent value
  *         status:
  *           type: string
  *           enum: ["active", "expired", "cancelled"]
@@ -50,11 +55,13 @@
  *           $ref: '#/components/schemas/Tenant'
  *         local:
  *           $ref: '#/components/schemas/Local'
+ *
  *     LeaseInput:
  *       type: object
  *       required:
  *         - startDate
  *         - endDate
+ *         - leaseAmount
  *         - localId
  *         - tenantId
  *       properties:
@@ -64,6 +71,11 @@
  *         endDate:
  *           type: string
  *           format: date-time
+ *         leaseAmount:
+ *           type: number
+ *           format: decimal
+ *           example: 500000.00
+ *           description: Agreed lease amount (monthly or total)
  *         status:
  *           type: string
  *           enum: ["active", "expired", "cancelled"]
@@ -105,7 +117,7 @@
  *               properties:
  *                 success:
  *                   type: boolean
- *                 leases:
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Lease'
@@ -113,10 +125,11 @@
  *                   type: integer
  *                 page:
  *                   type: integer
- *                 totalPages:
+ *                 limit:
  *                   type: integer
  *       500:
  *         description: Internal server error
+ *
  *   post:
  *     summary: Create a new lease
  *     tags: [Leases]
@@ -166,7 +179,7 @@
  *       404:
  *         description: Lease not found
  *   put:
- *     summary: Update a lease completely
+ *     summary: Update a lease
  *     tags: [Leases]
  *     security:
  *       - bearerAuth: []
@@ -190,41 +203,6 @@
  *         description: Validation error
  *       404:
  *         description: Lease not found
- *   patch:
- *     summary: Partially update a lease
- *     tags: [Leases]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               startDate:
- *                 type: string
- *                 format: date-time
- *               endDate:
- *                 type: string
- *                 format: date-time
- *               status:
- *                 type: string
- *                 enum: ["active", "expired", "cancelled"]
- *     responses:
- *       200:
- *         description: Lease partially updated successfully
- *       400:
- *         description: Validation error
- *       404:
- *         description: Lease not found
  *   delete:
  *     summary: Soft delete a lease
  *     tags: [Leases]
@@ -238,97 +216,8 @@
  *           type: string
  *           format: uuid
  *     responses:
- *       200:
+ *       204:
  *         description: Lease soft deleted successfully
- *       404:
- *         description: Lease not found
- */
-
-/**
- * @swagger
- * /api/leases/{id}/restore:
- *   patch:
- *     summary: Restore a soft-deleted lease (Admins only)
- *     tags: [Leases]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: Lease ID to restore
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Lease restored successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Lease restored successfully"
- *                 lease:
- *                   $ref: '#/components/schemas/Lease'
- *       403:
- *         description: Forbidden (only admins)
- *       404:
- *         description: Lease not found
- */
-
-/**
- * @swagger
- * /api/leases/{id}/status:
- *   patch:
- *     summary: Update the status of a lease
- *     tags: [Leases]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: ID of the lease to update
- *         schema:
- *           type: string
- *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - status
- *             properties:
- *               status:
- *                 type: string
- *                 enum: ["active", "expired", "cancelled"]
- *                 example: "expired"
- *     responses:
- *       200:
- *         description: Lease status updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Lease status updated successfully"
- *                 lease:
- *                   $ref: '#/components/schemas/Lease'
- *       400:
- *         description: Invalid status value
  *       404:
  *         description: Lease not found
  */

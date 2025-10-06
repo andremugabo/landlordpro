@@ -12,44 +12,43 @@ const Lease = sequelize.define(
       primaryKey: true,
       allowNull: false,
     },
-    startDate: {
+    start_date: {
       type: DataTypes.DATE,
       allowNull: false,
-      field: 'start_date',
     },
-    endDate: {
+    end_date: {
       type: DataTypes.DATE,
       allowNull: false,
-      field: 'end_date',
+    },
+    lease_amount: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: false,
+      defaultValue: 0,
     },
     status: {
       type: DataTypes.ENUM('active', 'expired', 'cancelled'),
       defaultValue: 'active',
       allowNull: false,
     },
-    localId: {
+    local_id: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: 'local_id',
     },
-    tenantId: {
+    tenant_id: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: 'tenant_id',
-    }
+    },
   },
   {
     tableName: 'leases',
-    timestamps: true,  // automatically adds createdAt & updatedAt
-    paranoid: true     // automatically adds deletedAt for soft deletes
+    timestamps: true,
+    paranoid: true,
+    underscored: true,
+    deletedAt: 'deleted_at',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at'
   }
 );
 
-// Associations
-Local.hasMany(Lease, { foreignKey: 'localId', as: 'leases' });
-Lease.belongsTo(Local, { foreignKey: 'localId', as: 'local' });
-
-Tenant.hasMany(Lease, { foreignKey: 'tenantId', as: 'leases' });
-Lease.belongsTo(Tenant, { foreignKey: 'tenantId', as: 'tenant' });
 
 module.exports = Lease;

@@ -4,6 +4,7 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_BASE_URL + '/api' || '/api';
 
 const leaseService = {
+  // ✅ Fetch all leases
   getLeases: async (page = 1, limit = 10) => {
     try {
       const res = await axios.get(`${API_URL}/leases?page=${page}&limit=${limit}`, {
@@ -16,9 +17,18 @@ const leaseService = {
     }
   },
 
+  // ✅ Create a new lease (includes leaseAmount)
   createLease: async (leaseData) => {
     try {
-      const res = await axios.post(`${API_URL}/leases`, leaseData, {
+      const payload = {
+        startDate: leaseData.startDate,
+        endDate: leaseData.endDate,
+        localId: leaseData.localId,
+        tenantId: leaseData.tenantId,
+        leaseAmount: leaseData.leaseAmount, // new field
+      };
+
+      const res = await axios.post(`${API_URL}/leases`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
       return res.data;
@@ -28,9 +38,19 @@ const leaseService = {
     }
   },
 
+  // ✅ Update existing lease (includes leaseAmount)
   updateLease: async (id, leaseData) => {
     try {
-      const res = await axios.put(`${API_URL}/leases/${id}`, leaseData, {
+      const payload = {
+        startDate: leaseData.startDate,
+        endDate: leaseData.endDate,
+        localId: leaseData.localId,
+        tenantId: leaseData.tenantId,
+        leaseAmount: leaseData.leaseAmount, // new field
+        status: leaseData.status,
+      };
+
+      const res = await axios.put(`${API_URL}/leases/${id}`, payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
       return res.data;
@@ -40,6 +60,7 @@ const leaseService = {
     }
   },
 
+  // ✅ Delete lease
   deleteLease: async (id) => {
     try {
       const res = await axios.delete(`${API_URL}/leases/${id}`, {
@@ -52,6 +73,7 @@ const leaseService = {
     }
   },
 
+  // ✅ Download PDF report
   downloadPdfReport: async () => {
     try {
       const res = await axios.get(`${API_URL}/report/pdf`, {

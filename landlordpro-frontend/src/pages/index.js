@@ -10,6 +10,8 @@ export { default as PropertyPage } from './adminPages/PropertyPage'
 export { default as LocalPage } from './adminPages/LocalPage'
 export { default as TenantPage } from './adminPages/TenantPage'
 export { default as LeasePage } from './adminPages/LeasePage'
+export { default as PaymentModePage } from './adminPages/PaymentModePage'
+export { default as PaymentPage } from './adminPages/PaymentPage'
 
 // Manager pages
 export { default as ManagerDashboard } from './managerPages/ManagerDashboard'

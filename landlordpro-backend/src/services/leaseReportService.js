@@ -1,14 +1,22 @@
 const PDFDocument = require('pdfkit');
 const Lease = require('../models/Lease');
+const Tenant = require('../models/Tenant');
+const Local = require('../models/Local');
 const path = require('path');
 
 async function generateProfessionalLeaseReport(res) {
   try {
-    const leases = await Lease.findAll({ include: ['tenant', 'local'] });
+    // ✅ Fetch leases with correct associations
+    const leases = await Lease.findAll({
+      include: [
+        { model: Tenant, as: 'tenantForLease' },
+        { model: Local, as: 'localForLease' }
+      ]
+    });
 
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
 
-    // Send directly to response
+    // Send PDF directly to response
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
@@ -17,49 +25,62 @@ async function generateProfessionalLeaseReport(res) {
 
     doc.pipe(res);
 
-    // ---- Optional: Add logo ----
+    // ---- Logo ----
     const logoPath = path.join(__dirname, '../assets/logo.png');
     doc.image(logoPath, 50, 20, { width: 100 });
 
-    // ---- Header ----
-    doc.fontSize(22).text('Lease Report', { align: 'center', underline: true });
+    // ---- Title ----
+    doc.fontSize(22).fillColor('#1f4e79').text('Lease Report', { align: 'center', underline: true });
     doc.moveDown(0.5);
-    doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'center' });
+    doc.fontSize(12).fillColor('#333').text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'center' });
     doc.moveDown(1.5);
 
-    // ---- Table headers ----
+    // ---- Table header ----
     const tableTop = doc.y;
-    const rowHeight = 25;
+    const rowHeight = 30;
 
     function generateTableHeader(y) {
-      doc.fontSize(12).font('Helvetica-Bold');
-      doc.text('Tenant', 50, y);
-      doc.text('Local', 180, y);
-      doc.text('Start Date', 300, y);
-      doc.text('End Date', 400, y);
-      doc.text('Status', 500, y);
-      doc.font('Helvetica');
-      return y + 20;
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#ffffff');
+
+      const headers = ['Tenant', 'Local', 'Start Date', 'End Date', 'Status'];
+      const xPositions = [50, 180, 300, 400, 500];
+
+      // Header background
+      doc.rect(45, y - 5, 520, rowHeight).fill('#4f81bd');
+
+      headers.forEach((header, i) => {
+        doc.text(header, xPositions[i], y, { width: xPositions[i + 1] ? xPositions[i + 1] - xPositions[i] : 100, align: 'left' });
+      });
+
+      doc.font('Helvetica').fillColor('#000000');
+      return y + rowHeight;
     }
 
     let y = generateTableHeader(tableTop);
 
+    // ---- Table rows ----
     leases.forEach((lease, i) => {
-      // Alternating row colors
+      // Alternate row shading
       if (i % 2 === 0) {
-        doc.rect(45, y - 5, 520, rowHeight).fillOpacity(0.1).fill('#f2f2f2').fillOpacity(1);
+        doc.rect(45, y - 5, 520, rowHeight).fillOpacity(0.1).fill('#d9e1f2').fillOpacity(1);
       }
 
+      // Text color based on status
+      let statusColor = '#000000';
+      if (lease.status === 'active') statusColor = '#228b22';
+      else if (lease.status === 'expired') statusColor = '#ff4500';
+      else if (lease.status === 'cancelled') statusColor = '#808080';
+
       doc.fillColor('#000000');
-      doc.text(lease.tenant?.name || '-', 50, y);
-      doc.text(lease.local?.reference_code || '-', 180, y);
-      doc.text(lease.startDate.toISOString().split('T')[0], 300, y);
-      doc.text(lease.endDate.toISOString().split('T')[0], 400, y);
-      doc.text(lease.status, 500, y);
+      doc.text(lease.tenantForLease?.name || '-', 50, y);
+      doc.text(lease.localForLease?.reference_code || '-', 180, y);
+      doc.text(lease.start_date?.toISOString().split('T')[0] || '-', 300, y);
+      doc.text(lease.end_date?.toISOString().split('T')[0] || '-', 400, y);
+      doc.fillColor(statusColor).text(lease.status || '-', 500, y);
 
       y += rowHeight;
 
-      // Add new page if near bottom
+      // New page if bottom reached
       if (y > 750) {
         doc.addPage();
         y = generateTableHeader(50);
@@ -77,7 +98,6 @@ async function generateProfessionalLeaseReport(res) {
     doc.end();
   } catch (err) {
     console.error('Error generating PDF:', err);
-    // Ensure response is not sent twice
     if (!res.headersSent) {
       res.status(500).json({ success: false, message: 'Failed to generate PDF report' });
     }

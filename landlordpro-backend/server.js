@@ -13,6 +13,8 @@ const propertyRoutes = require('./src/routes/propertyRoutes');
 const localRoutes = require('./src/routes/localRoutes');
 const tenantRoutes = require('./src/routes/tenantRoutes');
 const leaseRoutes = require('./src/routes/leaseRoutes');
+const paymentModeRoutes = require('./src/routes/paymentModeRoutes');
+const paymentRoutes = require('./src/routes/paymentRoutes')
 
 // Middleware
 app.use(express.json());
@@ -30,6 +32,8 @@ app.use('/api', propertyRoutes);
 app.use('/api',localRoutes);
 app.use('/api',tenantRoutes);
 app.use('/api', leaseRoutes);
+app.use('/api', paymentModeRoutes);
+app.use('/api',paymentRoutes);
 
 // Swagger
 setupSwagger(app);
