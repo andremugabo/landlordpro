@@ -5,6 +5,7 @@ import {
   getUnreadNotifications,
   markNotificationRead,
 } from '../../services/userService';
+import { useNavigate } from 'react-router-dom';
 
 const Topbar = ({ user, onLogout, onMenuClick }) => {
   const [darkMode, setDarkMode] = useState(
@@ -14,6 +15,12 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const menuRef = useRef(null);
+
+  const navigate = useNavigate();
+
+  const goToProfile = () => {
+    navigate('/profile');
+  };
 
   // Persist theme preference
   useEffect(() => {
@@ -52,7 +59,7 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
   const fetchNotifications = async () => {
     try {
       const data = await getUnreadNotifications();
-      setNotifications(Array.isArray(data) ? data : []);
+      setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
     } catch (err) {
       console.error('Failed to fetch notifications', err);
       toast.error('Failed to load notifications');
@@ -208,7 +215,7 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
                 </p>
               </div>
 
-              <button className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+              <button  onClick={goToProfile} className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                 <User className="w-4 h-4" /> Profile
               </button>
               <button className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">

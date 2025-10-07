@@ -25,7 +25,7 @@ const leaseService = {
         endDate: leaseData.endDate,
         localId: leaseData.localId,
         tenantId: leaseData.tenantId,
-        leaseAmount: leaseData.leaseAmount, // new field
+        leaseAmount: leaseData.leaseAmount, 
       };
 
       const res = await axios.post(`${API_URL}/leases`, payload, {
@@ -46,7 +46,7 @@ const leaseService = {
         endDate: leaseData.endDate,
         localId: leaseData.localId,
         tenantId: leaseData.tenantId,
-        leaseAmount: leaseData.leaseAmount, // new field
+        leaseAmount: leaseData.leaseAmount,
         status: leaseData.status,
       };
 

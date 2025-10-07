@@ -25,7 +25,7 @@
  *         role:
  *           type: string
  *           enum: [admin, manager, employee]
- *           example: "user"
+ *           example: "employee"
  *         is_active:
  *           type: boolean
  *           example: true
@@ -41,9 +41,9 @@
 
 /**
  * @swagger
- * /api/register:
+ * /api/auth/register:
  *   post:
- *     summary: Register a new user (Admins only)
+ *     summary: Register a new user (Admin only)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -71,7 +71,7 @@
  *               role:
  *                 type: string
  *                 enum: [admin, manager, employee]
- *                 example: "user"
+ *                 example: "employee"
  *     responses:
  *       201:
  *         description: User created successfully
@@ -159,7 +159,7 @@
  * @swagger
  * /api/users/{id}:
  *   put:
- *     summary: Update a user (authenticated)
+ *     summary: Update a user (Admin only)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -167,7 +167,7 @@
  *       - in: path
  *         name: id
  *         required: true
- *         description: User ID to update (only admins can update others)
+ *         description: User ID to update
  *         schema:
  *           type: string
  *     requestBody:
@@ -183,7 +183,7 @@
  *                 type: string
  *               role:
  *                 type: string
- *                 enum: [admin, user, manager]
+ *                 enum: [admin, manager, employee]
  *     responses:
  *       200:
  *         description: User updated successfully
@@ -206,7 +206,7 @@
  * @swagger
  * /api/users/{id}/disable:
  *   put:
- *     summary: Disable a user (authenticated)
+ *     summary: Disable a user (Admin only)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -214,7 +214,7 @@
  *       - in: path
  *         name: id
  *         required: true
- *         description: User ID to disable (only admins can disable others)
+ *         description: User ID to disable
  *         schema:
  *           type: string
  *     responses:

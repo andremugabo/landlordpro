@@ -1,5 +1,5 @@
 const { DataTypes, Model } = require('sequelize');
-const sequelize = require('../../db'); // adjust path
+const sequelize = require('../../db'); 
 const Joi = require('joi');
 
 class User extends Model {}
@@ -9,7 +9,8 @@ User.init({
   email: { type: DataTypes.STRING, allowNull: false, unique: true },
   password_hash: { type: DataTypes.STRING, allowNull: false },
   full_name: { type: DataTypes.STRING, allowNull: false },
-  role: { type: DataTypes.ENUM('admin', 'manager', 'employee'), defaultValue: 'user' },
+  role: { type: DataTypes.ENUM('admin', 'manager', 'employee'), defaultValue: 'employee' },
+  picture: {type: DataTypes.STRING, allowNull:true},
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
   created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 }, {
@@ -35,7 +36,9 @@ const loginSchema = Joi.object({
 const updateSchema = Joi.object({
   full_name: Joi.string().min(3).max(100).optional(),
   email: Joi.string().email().optional(),
-  role: Joi.string().valid('admin', 'manager','employee').optional()
+  role: Joi.string().valid('admin', 'manager','employee').optional(),
+  is_active: Joi.boolean().optional(),
+  picture: Joi.string().uri().optional(),
 });
 
 const disableSchema = Joi.object({

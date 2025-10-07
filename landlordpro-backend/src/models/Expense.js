@@ -11,35 +11,58 @@ const Expense = sequelize.define(
     },
     amount: { 
       type: DataTypes.DECIMAL(12, 2), 
-      allowNull: false 
+      allowNull: false,
+      validate: {
+        isDecimal: true,
+        min: 0.01
+      }
     },
     category: { 
-      type: DataTypes.STRING, 
-      allowNull: false 
+      type: DataTypes.STRING(100), 
+      allowNull: false,
+      validate: {
+        notEmpty: true
+      }
     },
     description: { 
       type: DataTypes.TEXT, 
       allowNull: true 
     },
     date: { 
-      type: DataTypes.DATE, 
-      defaultValue: DataTypes.NOW 
+      type: DataTypes.DATEONLY,  // 💡 Only store date (no time)
+      defaultValue: DataTypes.NOW
     },
     propertyId: { 
       type: DataTypes.UUID, 
       allowNull: true, 
-      field: 'property_id' 
+      field: 'property_id',
+      references: {
+        model: 'properties',
+        key: 'id'
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'SET NULL'
     },
     localId: { 
       type: DataTypes.UUID, 
       allowNull: true, 
-      field: 'local_id' 
+      field: 'local_id',
+      references: {
+        model: 'locals',
+        key: 'id'
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'SET NULL'
     }
   },
   {
     tableName: 'expenses',
     timestamps: true,
-    underscored: true
+    underscored: true,
+    indexes: [
+      { fields: ['category'] },
+      { fields: ['date'] }
+    ]
   }
 );
 

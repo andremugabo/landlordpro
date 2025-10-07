@@ -12,7 +12,9 @@ Notification.init(
     is_read: { type: DataTypes.BOOLEAN, defaultValue: false },
     lease_id: { type: DataTypes.UUID, allowNull: true },
     payment_id: { type: DataTypes.UUID, allowNull: true },
-    document_id: { type: DataTypes.UUID, allowNull: true }
+    document_id: { type: DataTypes.UUID, allowNull: true },
+    createdAt: { type: DataTypes.DATE, field: 'created_at' },
+    updatedAt: { type: DataTypes.DATE, field: 'updated_at' },
   },
   {
     sequelize,

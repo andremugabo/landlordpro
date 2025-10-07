@@ -14,7 +14,7 @@ async function getAllLocals({ page = 1, limit = 10, propertyId = null } = {}) {
     limit,
     offset,
     include: [{ model: Property, as: 'property' }],
-    order: [['createdAt', 'DESC']],
+    order: [['created_at', 'DESC']],
   });
 
   return {

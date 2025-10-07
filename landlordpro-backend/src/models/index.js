@@ -18,10 +18,10 @@ Property.hasMany(Local, { foreignKey: 'property_id', as: 'localsForProperty' });
 Local.belongsTo(Property, { foreignKey: 'property_id', as: 'property' });
 
 Tenant.hasMany(Lease, { foreignKey: 'tenant_id', as: 'leasesForTenant' });
-Lease.belongsTo(Tenant, { foreignKey: 'tenant_id', as: 'tenantForLease' });
+Lease.belongsTo(Tenant, { foreignKey: 'tenant_id', as: 'tenant' });
 
 Local.hasMany(Lease, { foreignKey: 'local_id', as: 'leasesForLocal' });
-Lease.belongsTo(Local, { foreignKey: 'local_id', as: 'localForLease' });
+Lease.belongsTo(Local, { foreignKey: 'local_id', as: 'local' });
 
 Lease.hasMany(Payment, { foreignKey: 'lease_id', as: 'paymentsForLease' });
 Payment.belongsTo(Lease, { foreignKey: 'lease_id', as: 'leaseForPayment' });

@@ -29,6 +29,10 @@
  *           type: string
  *           format: date-time
  *           example: "2025-10-02T14:00:00.000Z"
+ *         updated_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-10-02T14:05:00.000Z"
  *         user:
  *           type: object
  *           properties:
@@ -125,9 +129,8 @@
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Notification marked as read"
+ *                 notification:
+ *                   $ref: '#/components/schemas/Notification'
  *       401:
  *         description: Unauthorized
  *       404:

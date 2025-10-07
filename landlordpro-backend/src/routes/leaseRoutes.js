@@ -8,7 +8,7 @@ const { authenticate, adminOnly } = require('../middleware/authMiddleware');
 
 
 
-router.get('/leases/', authenticate, leaseController.getAllLeases);
+router.get('/leases', authenticate, leaseController.getAllLeases);
 router.get('/leases/:id', authenticate, leaseController.getLease);
 router.post('/leases/', authenticate, leaseController.createLease);
 router.put('/leases/:id', authenticate, leaseController.updateLease);

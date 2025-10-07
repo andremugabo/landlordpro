@@ -10,6 +10,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Pages.LoginPage /> },
       { path: 'forgot-password', element: <Pages.ForgotPassword /> },
       { path: 'reset-password', element: <Pages.ResetPassword /> },
+      { path: 'profile', element: <Pages.ProfilePage /> },
       { path: '*', element: <Pages.NotFoundPage /> }
     ]
   },
@@ -19,20 +20,19 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Pages.AdminDashboard /> }, 
       { path: '/admin/adminUsers', element: <Pages.AdminUsersPage /> },
-      { path: '/admin/adminUsers', element: <Pages.AdminUsersPage /> },
       { path: '/admin/properties', element: <Pages.PropertyPage /> },
       { path: '/admin/locals', element: <Pages.LocalPage /> },
-      {path: '/admin/tenants', element: <Pages.TenantPage/>},
-      {path: '/admin/leases', element: <Pages.LeasePage/>},
-      {path: '/admin/paymentMode', element: <Pages.PaymentModePage/>},
-      {path: '/admin/payments', element: <Pages.PaymentPage/>},
+      { path: '/admin/tenants', element: <Pages.TenantPage/>},
+      { path: '/admin/leases', element: <Pages.LeasePage/>},
+      { path: '/admin/paymentMode', element: <Pages.PaymentModePage/>},
+      { path: '/admin/payments', element: <Pages.PaymentPage/>},
     ]
   },
   {
     path: '/manager',
     element: <Layouts.ManagerLayout />,
     children: [
-      { index: true, element: <Pages.ManagerDashboard /> } 
+      { index: true, element: <Pages.ManagerDashboard /> },
     ]
   }
 ]);

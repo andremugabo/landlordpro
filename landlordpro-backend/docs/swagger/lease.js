@@ -15,15 +15,15 @@
  *         id:
  *           type: string
  *           format: uuid
- *           example: "d290f1ee-6c54-4b01-90e6-d701748f0851"
+ *           example: d290f1ee-6c54-4b01-90e6-d701748f0851
  *         startDate:
  *           type: string
  *           format: date-time
- *           example: "2025-10-05T10:00:00Z"
+ *           example: 2025-10-05T10:00:00Z
  *         endDate:
  *           type: string
  *           format: date-time
- *           example: "2026-10-05T10:00:00Z"
+ *           example: 2026-10-05T10:00:00Z
  *         leaseAmount:
  *           type: number
  *           format: decimal
@@ -31,16 +31,16 @@
  *           description: Monthly lease amount or rent value
  *         status:
  *           type: string
- *           enum: ["active", "expired", "cancelled"]
- *           example: "active"
+ *           enum: [active, expired, cancelled]
+ *           example: active
  *         localId:
  *           type: string
  *           format: uuid
- *           example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+ *           example: f47ac10b-58cc-4372-a567-0e02b2c3d479
  *         tenantId:
  *           type: string
  *           format: uuid
- *           example: "c56a4180-65aa-42ec-a945-5fd21dec0538"
+ *           example: c56a4180-65aa-42ec-a945-5fd21dec0538
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -68,9 +68,11 @@
  *         startDate:
  *           type: string
  *           format: date-time
+ *           example: 2025-10-05T10:00:00Z
  *         endDate:
  *           type: string
  *           format: date-time
+ *           example: 2026-10-05T10:00:00Z
  *         leaseAmount:
  *           type: number
  *           format: decimal
@@ -78,8 +80,8 @@
  *           description: Agreed lease amount (monthly or total)
  *         status:
  *           type: string
- *           enum: ["active", "expired", "cancelled"]
- *           example: "active"
+ *           enum: [active, expired, cancelled]
+ *           example: active
  *         localId:
  *           type: string
  *           format: uuid
@@ -92,7 +94,7 @@
  * @swagger
  * /api/leases:
  *   get:
- *     summary: Get all leases with pagination
+ *     summary: Get all leases (paginated)
  *     tags: [Leases]
  *     security:
  *       - bearerAuth: []
@@ -101,15 +103,17 @@
  *         name: page
  *         schema:
  *           type: integer
+ *           example: 1
  *         description: Page number
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
+ *           example: 10
  *         description: Number of items per page
  *     responses:
  *       200:
- *         description: List of leases
+ *         description: List of leases retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -117,6 +121,7 @@
  *               properties:
  *                 success:
  *                   type: boolean
+ *                   example: true
  *                 data:
  *                   type: array
  *                   items:
@@ -125,7 +130,7 @@
  *                   type: integer
  *                 page:
  *                   type: integer
- *                 limit:
+ *                 totalPages:
  *                   type: integer
  *       500:
  *         description: Internal server error
@@ -143,7 +148,17 @@
  *             $ref: '#/components/schemas/LeaseInput'
  *     responses:
  *       201:
- *         description: Lease created successfully
+ *         description: Lease created successfully (notification sent to tenant)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 lease:
+ *                   $ref: '#/components/schemas/Lease'
  *       400:
  *         description: Validation error
  */
@@ -166,7 +181,7 @@
  *         description: Lease ID
  *     responses:
  *       200:
- *         description: Lease details
+ *         description: Lease details retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -174,12 +189,14 @@
  *               properties:
  *                 success:
  *                   type: boolean
+ *                   example: true
  *                 lease:
  *                   $ref: '#/components/schemas/Lease'
  *       404:
  *         description: Lease not found
+ *
  *   put:
- *     summary: Update a lease
+ *     summary: Update a lease by ID
  *     tags: [Leases]
  *     security:
  *       - bearerAuth: []
@@ -198,13 +215,24 @@
  *             $ref: '#/components/schemas/LeaseInput'
  *     responses:
  *       200:
- *         description: Lease updated successfully
+ *         description: Lease updated successfully (notification sent to tenant)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 lease:
+ *                   $ref: '#/components/schemas/Lease'
  *       400:
  *         description: Validation error
  *       404:
  *         description: Lease not found
+ *
  *   delete:
- *     summary: Soft delete a lease
+ *     summary: Delete a lease by ID
  *     tags: [Leases]
  *     security:
  *       - bearerAuth: []
@@ -217,7 +245,7 @@
  *           format: uuid
  *     responses:
  *       204:
- *         description: Lease soft deleted successfully
+ *         description: Lease deleted successfully (notification sent to tenant)
  *       404:
  *         description: Lease not found
  */
