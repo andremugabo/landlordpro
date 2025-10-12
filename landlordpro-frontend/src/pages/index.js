@@ -13,6 +13,7 @@ export { default as TenantPage } from './adminPages/TenantPage'
 export { default as LeasePage } from './adminPages/LeasePage'
 export { default as PaymentModePage } from './adminPages/PaymentModePage'
 export { default as PaymentPage } from './adminPages/PaymentPage'
+export { default as ExpensePage } from './adminPages/ExpensePage'
 
 // Manager pages
 export { default as ManagerDashboard } from './managerPages/ManagerDashboard'

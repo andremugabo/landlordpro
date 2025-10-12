@@ -1,24 +1,28 @@
 # 🏠 LandlordPro
 
-**LandlordPro** is a full-stack property management system for landlords and tenants.
+**LandlordPro** is a full-stack property management system for landlords and tenants.  
 It provides tools for managing **properties, tenants, leases, payments, expenses, and notifications** — all in one modern and scalable platform.
 
 ---
 
 ## 🚀 Tech Stack
 
-* **Frontend**: React + Vite + TailwindCSS
-* **Backend**: Node.js + Express + Sequelize
-* **Database**: PostgreSQL
-* **Authentication**: JWT (JSON Web Tokens)
-* **Validation**: Joi
-* **API Documentation**: Swagger
+* **Frontend**: React 19.1.1 + Vite 7.1.7 + TailwindCSS 4.1.13  
+* **Backend**: Node.js + Express + Sequelize  
+* **Database**: PostgreSQL  
+* **Authentication**: JWT (JSON Web Tokens)  
+* **Validation**: Joi  
+* **State Management**: Redux Toolkit 2.9.0  
+* **Routing**: React Router DOM 7.9.3  
+* **Forms & Validation**: React Hook Form 7.63.0 + Zod 4.1.11  
+* **API Documentation**: Swagger  
 
 ---
 
 ## 📂 Project Structure
 
 ```
+
 landlordpro/
 │
 ├── backend/               # Node.js + Express backend
@@ -32,14 +36,15 @@ landlordpro/
 │   └── package.json
 │
 ├── frontend/              # React + Vite frontend
-│   ├── src/               # Components, pages, and hooks
+│   ├── src/               # Components, pages, hooks
 │   ├── public/            # Static assets
 │   ├── index.html
 │   └── package.json
 │
 ├── README.md
 └── .env
-```
+
+````
 
 ---
 
@@ -50,7 +55,7 @@ landlordpro/
 ```bash
 cd backend
 npm install
-```
+````
 
 ### 2️⃣ Configure Environment Variables
 
@@ -69,37 +74,26 @@ JWT_SECRET=your_super_secret_key
 JWT_EXPIRES_IN=1h
 ```
 
----
-
 ### 3️⃣ Sync Database
-
-This will create or update database tables based on your Sequelize models:
 
 ```bash
 npm run sync
 ```
 
----
-
 ### 4️⃣ Seed Data
-
-Seed sample users, payment modes, and default data:
 
 ```bash
 npm run seed
 ```
 
----
-
 ### 5️⃣ Run the Backend
 
 ```bash
 npm run dev    # Development (with nodemon)
-# or
 npm start      # Production
 ```
 
-Backend will run at:
+Backend available at:
 👉 **[http://localhost:3000](http://localhost:3000)**
 
 ---
@@ -118,23 +112,16 @@ npm install
 Create a `.env` file in `/frontend`:
 
 ```env
-# Base URL for backend API
 VITE_API_BASE_URL=http://localhost:3000
-
-# Optional: environment mode
 VITE_APP_ENV=development
 ```
 
-For **production**, use:
+For **production**:
 
 ```env
 VITE_API_BASE_URL=/api
 VITE_APP_ENV=production
 ```
-
-✅ This ensures that when deployed, the frontend correctly targets your backend API (e.g., [https://saintmichel.rw/api](https://saintmichel.rw/api)).
-
----
 
 ### 3️⃣ Run the Frontend
 
@@ -144,13 +131,6 @@ npm run dev
 
 Frontend available at:
 👉 **[http://localhost:5173](http://localhost:5173)**
-
----
-
-## 📖 API Documentation
-
-Swagger UI is available at:
-👉 **[http://localhost:3000/api-docs](http://localhost:3000/api-docs)**
 
 ---
 
@@ -172,6 +152,7 @@ Swagger UI is available at:
 | `npm run dev`     | Run Vite development server |
 | `npm run build`   | Build production frontend   |
 | `npm run preview` | Preview built frontend      |
+| `npm run lint`    | Run ESLint checks           |
 
 ---
 
@@ -189,8 +170,6 @@ Each token contains:
 * `userId`
 * `role`
 * `expiration`
-
-Middleware ensures only valid tokens can access protected resources.
 
 ---
 
@@ -222,9 +201,60 @@ const registerSchema = Joi.object({
 ✅ Real-time notifications
 ✅ API documentation (Swagger)
 ✅ Modern responsive frontend (React + TailwindCSS)
+✅ State management with Redux Toolkit
+✅ Form handling & validation with React Hook Form + Zod
 
 ---
 
+## 👤 Profile & Notifications
+
+### **Profile API**
+
+| Endpoint       | Method | Description                       | Auth |
+| -------------- | ------ | --------------------------------- | ---- |
+| `/api/profile` | GET    | Get current logged-in user's info | JWT  |
+| `/api/profile` | PUT    | Update profile details            | JWT  |
+
+**Example: Get Profile**
+
+```bash
+curl -X GET "http://localhost:3000/api/profile" \
+-H "Authorization: Bearer <token>"
+```
+
+**Example: Update Profile**
+
+```bash
+curl -X PUT "http://localhost:3000/api/profile" \
+-H "Authorization: Bearer <token>" \
+-H "Content-Type: application/json" \
+-d '{"full_name":"New Name","email":"newemail@example.com"}'
+```
+
+---
+
+### **Notifications API**
+
+| Endpoint                       | Method | Description                        | Auth        |
+| ------------------------------ | ------ | ---------------------------------- | ----------- |
+| `/api/notifications`           | GET    | Get all notifications for the user | JWT         |
+| `/api/notifications/unread`    | GET    | Get unread notifications           | JWT         |
+| `/api/notifications/{id}/read` | PUT    | Mark a notification as read        | JWT         |
+| `/api/notifications/all`       | GET    | Get all notifications (admin only) | JWT + Admin |
+
+**Example: Get Unread Notifications**
+
+```bash
+curl -X GET "http://localhost:3000/api/notifications/unread" \
+-H "Authorization: Bearer <token>"
+```
+
+**Example: Mark Notification as Read**
+
+```bash
+curl -X PUT "http://localhost:3000/api/notifications/notification_id/read" \
+-H "Authorization: Bearer <token>"
+```
 
 
 

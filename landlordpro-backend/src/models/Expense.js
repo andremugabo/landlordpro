@@ -29,7 +29,7 @@ const Expense = sequelize.define(
       allowNull: true 
     },
     date: { 
-      type: DataTypes.DATEONLY,  // 💡 Only store date (no time)
+      type: DataTypes.DATEONLY,  
       defaultValue: DataTypes.NOW
     },
     propertyId: { 

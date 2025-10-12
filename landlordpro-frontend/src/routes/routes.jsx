@@ -26,6 +26,7 @@ export const router = createBrowserRouter([
       { path: '/admin/leases', element: <Pages.LeasePage/>},
       { path: '/admin/paymentMode', element: <Pages.PaymentModePage/>},
       { path: '/admin/payments', element: <Pages.PaymentPage/>},
+      { path: '/admin/expenses', element: <Pages.ExpensePage/>},
     ]
   },
   {

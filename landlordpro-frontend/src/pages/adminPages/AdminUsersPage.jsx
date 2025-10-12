@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { getAllUsers, updateUser, disableUser, enableUser, registerUser } from '../../services/userService';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { getAllUsers, updateUser, disableUser, enableUser, registerUser } from '../../services/UserService';
 import { Button, Modal, Input, Card } from '../../components';
 import { FiEdit, FiUserPlus, FiEye, FiEyeOff, FiSearch, FiMail, FiUser } from 'react-icons/fi';
 import { showSuccess, showError, showInfo } from '../../utils/toastHelper';
@@ -19,17 +19,18 @@ const AdminUsersPage = () => {
   const [editData, setEditData] = useState({ full_name: '', email: '', role: '', password: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const fetchUsers = async (pageNumber = 1) => {
+  const fetchUsers = useCallback(async (pageNumber = 1) => {
     try {
       setLoading(true);
       const data = await getAllUsers(pageNumber, 10);
   
       const { users, totalPages, page } = data;
   
-      // If page is out of bounds (e.g., empty after deletion), go to previous page
+      // If page is out of bounds, go to previous page
       if (users.length === 0 && pageNumber > 1) {
         return fetchUsers(pageNumber - 1);
       }
@@ -39,32 +40,59 @@ const AdminUsersPage = () => {
       setPage(page);
     } catch (err) {
       console.error('Failed to fetch users:', err);
+      showError('Failed to load users');
       setUsers([]);
       setTotalPages(1);
       setPage(1);
     } finally {
       setLoading(false);
     }
-  };
-  
+  }, []);
 
   useEffect(() => {
     fetchUsers(page);
-  }, [page]);
+  }, [page, fetchUsers]);
 
   const handleEditClick = (user) => {
     setSelectedUser(user);
-    setEditData({ full_name: user.full_name, email: user.email, role: user.role, password: '' });
+    setEditData({ 
+      full_name: user.full_name, 
+      email: user.email, 
+      role: user.role, 
+      password: '' 
+    });
     setModalOpen(true);
   };
 
+  const handleAddClick = () => {
+    setSelectedUser(null);
+    setEditData({ full_name: '', email: '', role: '', password: '' });
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedUser(null);
+    setEditData({ full_name: '', email: '', role: '', password: '' });
+  };
+
   const handleSubmit = async () => {
+    if (submitting) return; // Prevent double submission
+    
     try {
+      setSubmitting(true);
       const { full_name, email, role, password } = editData;
   
-      // --- Validate required fields ---
+      // Validate required fields
       if (!full_name?.trim() || !email?.trim() || !role?.trim()) {
         showError('Full name, email, and role are required.');
+        return;
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showError('Please enter a valid email address.');
         return;
       }
   
@@ -78,47 +106,52 @@ const AdminUsersPage = () => {
         // Update existing user
         await updateUser(selectedUser.id, { full_name, email, role });
         showSuccess('User updated successfully!');
-        fetchUsers(page);
+        await fetchUsers(page);
       } else {
         // Adding new user requires password
         if (!password?.trim()) {
           showError('Password is required for new users.');
           return;
         }
+        if (password.length < 6) {
+          showError('Password must be at least 6 characters.');
+          return;
+        }
         await registerUser({ full_name, email, role, password });
         showSuccess('User added successfully!');
         setPage(1);
-        fetchUsers(1);
+        await fetchUsers(1);
       }
   
-      setModalOpen(false);
-      setSelectedUser(null);
-      setEditData({ full_name: '', email: '', role: '', password: '' });
+      handleCloseModal();
     } catch (err) {
-      // Catch Axios error message if backend responds with JSON
       const message = err.response?.data?.message || err.message || 'Failed to save user';
       showError(message);
+    } finally {
+      setSubmitting(false);
     }
   };
-  
-  
 
   const handleDisableEnable = async (user) => {
     try {
       await (user.is_active ? disableUser(user.id) : enableUser(user.id));
       showInfo(`User ${user.is_active ? 'disabled' : 'enabled'} successfully.`);
-      fetchUsers(page);
+      await fetchUsers(page);
     } catch (err) {
-      showError(err.message || 'Failed to update user status');
+      const message = err.response?.data?.message || err.message || 'Failed to update user status';
+      showError(message);
     }
   };
 
   const filteredUsers = useMemo(() => {
     if (!Array.isArray(users)) return [];
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return users;
+    
     return users.filter(user =>
-      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.role?.toLowerCase().includes(searchTerm.toLowerCase())
+      user.full_name?.toLowerCase().includes(term) ||
+      user.email?.toLowerCase().includes(term) ||
+      user.role?.toLowerCase().includes(term)
     );
   }, [users, searchTerm]);
 
@@ -132,11 +165,7 @@ const AdminUsersPage = () => {
         </div>
         <Button
           className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm transition w-full sm:w-auto justify-center"
-          onClick={() => {
-            setSelectedUser(null);
-            setEditData({ full_name: '', email: '', role: '', password: '' });
-            setModalOpen(true);
-          }}
+          onClick={handleAddClick}
         >
           <FiUserPlus className="text-base" />
           <span>Add User</span>
@@ -175,7 +204,7 @@ const AdminUsersPage = () => {
                 {filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-6 text-center text-gray-500">
-                      No users found
+                      {searchTerm ? 'No users match your search' : 'No users found'}
                     </td>
                   </tr>
                 ) : (
@@ -194,10 +223,16 @@ const AdminUsersPage = () => {
                         </span>
                       </td>
                       <td className="p-3 flex justify-center gap-2">
-                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1" onClick={() => handleEditClick(user)}>
+                        <Button 
+                          className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1" 
+                          onClick={() => handleEditClick(user)}
+                        >
                           <FiEdit className="text-sm" /> Edit
                         </Button>
-                        <Button className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs text-white ${user.is_active ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`} onClick={() => handleDisableEnable(user)}>
+                        <Button 
+                          className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs text-white ${user.is_active ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`} 
+                          onClick={() => handleDisableEnable(user)}
+                        >
                           {user.is_active ? <FiEyeOff /> : <FiEye />}
                           {user.is_active ? 'Disable' : 'Enable'}
                         </Button>
@@ -215,7 +250,9 @@ const AdminUsersPage = () => {
           {loading ? (
             <div className="text-center text-gray-500 py-8">Loading users...</div>
           ) : filteredUsers.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">No users found</div>
+            <div className="text-center text-gray-500 py-8">
+              {searchTerm ? 'No users match your search' : 'No users found'}
+            </div>
           ) : filteredUsers.map(user => (
             <Card key={user.id} className="p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center">
@@ -237,10 +274,16 @@ const AdminUsersPage = () => {
                 </span>
               </div>
               <div className="flex gap-2 mt-2">
-                <Button className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-xs flex items-center justify-center gap-1" onClick={() => handleEditClick(user)}>
+                <Button 
+                  className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-xs flex items-center justify-center gap-1" 
+                  onClick={() => handleEditClick(user)}
+                >
                   <FiEdit className="text-sm" /> Edit
                 </Button>
-                <Button className={`flex-1 flex items-center justify-center gap-1 px-3 py-1 rounded-md text-xs text-white ${user.is_active ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`} onClick={() => handleDisableEnable(user)}>
+                <Button 
+                  className={`flex-1 flex items-center justify-center gap-1 px-3 py-1 rounded-md text-xs text-white ${user.is_active ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`} 
+                  onClick={() => handleDisableEnable(user)}
+                >
                   {user.is_active ? <FiEyeOff /> : <FiEye />}
                   {user.is_active ? 'Disable' : 'Enable'}
                 </Button>
@@ -251,37 +294,79 @@ const AdminUsersPage = () => {
       </div>
 
       {/* Pagination */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-2 px-4 py-3 border-t border-gray-100 bg-white text-sm text-gray-600 rounded-lg shadow-sm">
-        <div className="text-gray-500">
-          Page <span className="font-medium">{page}</span> of <span className="font-medium">{totalPages}</span>
+      {!loading && totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-2 px-4 py-3 border-t border-gray-100 bg-white text-sm text-gray-600 rounded-lg shadow-sm">
+          <div className="text-gray-500">
+            Page <span className="font-medium">{page}</span> of <span className="font-medium">{totalPages}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              disabled={page <= 1}
+              className={`px-3 py-1 rounded-md border text-xs font-medium transition ${page <= 1 ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+            >
+              ← Prev
+            </button>
+            <span className="px-2 text-gray-500 text-xs">{page}</span>
+            <button
+              onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={page >= totalPages}
+              className={`px-3 py-1 rounded-md border text-xs font-medium transition ${page >= totalPages ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+            >
+              Next →
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-            disabled={page <= 1}
-            className={`px-3 py-1 rounded-md border text-xs font-medium transition ${page <= 1 ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
-          >
-            ← Prev
-          </button>
-          <span className="px-2 text-gray-500 text-xs">{page}</span>
-          <button
-            onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={page >= totalPages}
-            className={`px-3 py-1 rounded-md border text-xs font-medium transition ${page >= totalPages ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
-          >
-            Next →
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Modal */}
       {modalOpen && (
-        <Modal title={selectedUser ? 'Edit User' : 'Add New User'} onClose={() => setModalOpen(false)} onSubmit={handleSubmit}>
+        <Modal 
+          title={selectedUser ? 'Edit User' : 'Add New User'} 
+          onClose={handleCloseModal} 
+          onSubmit={handleSubmit}
+          submitDisabled={submitting}
+          submitText={submitting ? 'Saving...' : 'Save'}
+        >
           <div className="space-y-4">
-            <Input label="Full Name" value={editData.full_name} onChange={(e) => setEditData({ ...editData, full_name: e.target.value })} />
-            <Input label="Email" type="email" value={editData.email} onChange={(e) => setEditData({ ...editData, email: e.target.value })} />
-            <Input label="Role" value={editData.role} onChange={(e) => setEditData({ ...editData, role: e.target.value })} placeholder="admin / manager / landlord / tenant" />
-            {!selectedUser && <Input label="Password" type="password" value={editData.password || ''} onChange={(e) => setEditData({ ...editData, password: e.target.value })} placeholder="Set a password for the new user" />}
+            <Input 
+              label="Full Name" 
+              value={editData.full_name} 
+              onChange={(e) => setEditData({ ...editData, full_name: e.target.value })} 
+              required
+            />
+            <Input 
+              label="Email" 
+              type="email" 
+              value={editData.email} 
+              onChange={(e) => setEditData({ ...editData, email: e.target.value })} 
+              required
+            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <select
+                value={editData.role}
+                onChange={(e) => setEditData({ ...editData, role: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Select a role</option>
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="landlord">Landlord</option>
+                <option value="tenant">Tenant</option>
+              </select>
+            </div>
+            {!selectedUser && (
+              <Input 
+                label="Password" 
+                type="password" 
+                value={editData.password || ''} 
+                onChange={(e) => setEditData({ ...editData, password: e.target.value })} 
+                placeholder="Min 6 characters"
+                required
+              />
+            )}
           </div>
         </Modal>
       )}

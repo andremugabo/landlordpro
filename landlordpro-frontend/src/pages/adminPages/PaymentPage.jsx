@@ -66,6 +66,7 @@ const PaymentPage = () => {
   // ✅ Create payment
   const handleSubmit = async () => {
     const { amount, leaseId, paymentModeId, proof } = editData;
+    console.log(editData)
     if (!amount || !leaseId || !paymentModeId)
       return showError('Amount, Lease, and Payment Mode are required.');
 
@@ -184,7 +185,7 @@ const PaymentPage = () => {
                     {filteredPayments.map((p) => {
                       const lease = leases.find((l) => l.id === p.leaseId);
                       const leaseName =
-                        lease?.localForLease?.referenceCode || lease?.localForLease?.name || 'N/A';
+                        lease?.leaseForPayment?.reference || lease?.leaseForPayment?.reference || 'N/A';
                       const modeName =
                         paymentModes.find((m) => m.id === p.paymentModeId)?.displayName || 'N/A';
 
@@ -195,16 +196,28 @@ const PaymentPage = () => {
                           <td className="p-3">{leaseName}</td>
                           <td className="p-3">{modeName}</td>
                           <td className="p-3">
-                            {p.proofUrl ? (
-                              <img
-                                src={p.proofUrl}
-                                alt="proof"
-                                className="max-h-20 rounded-md shadow cursor-pointer"
-                                onClick={() => handleViewProof(p.proofUrl)}
-                              />
-                            ) : (
-                              <span className="text-gray-400">N/A</span>
-                            )}
+                          {p.proofUrl ? (
+                                  <div className="mt-2 flex flex-col gap-2">
+                                    <img
+                                      src={p.proofUrl}
+                                      alt="proof"
+                                      className="max-h-40 w-full object-contain rounded-md shadow cursor-pointer"
+                                      onClick={() => handleViewProof(p.proofUrl)}
+                                    />
+                                    <label className="cursor-pointer text-blue-600 text-xs hover:underline">
+                                      Update Proof
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => handleUpdateProof(p.id, e)}
+                                      />
+                                    </label>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400">N/A</span>
+                                )}
+
                           </td>
                           <td className="p-3 flex justify-center gap-2">
                             {!p.deleted_at ? (
@@ -231,19 +244,26 @@ const PaymentPage = () => {
               </Card>
             </div>
 
-            {/* ✅ Mobile Cards */}
-            <div className="md:hidden grid gap-3">
-              {filteredPayments.map((p) => {
-                const lease = leases.find((l) => l.id === p.leaseId);
-                const leaseName =
-                  lease?.localForLease?.reference_code || lease?.localForLease?.name || 'N/A';
-                const modeName =
-                  paymentModes.find((m) => m.id === p.paymentModeId)?.displayName || 'N/A';
+            {/* Mobile Cards */}
+          <div className="md:hidden grid gap-3">
+            {filteredPayments.map((p) => {
+              const lease = leases.find((l) => l.id === p.leaseId);
+              const leaseName =
+                lease?.localForLease?.reference_code || lease?.localForLease?.name || 'N/A';
+              const modeName =
+                paymentModes.find((m) => m.id === p.paymentModeId)?.displayName || 'N/A';
 
-                return (
-                  <Card key={p.id} className="p-4 rounded-lg shadow-sm border border-gray-100 bg-white">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-semibold text-gray-700">{p.invoiceNumber}</span>
+              return (
+                <Card
+                  key={p.id}
+                  className="p-4 rounded-xl shadow-md border border-gray-100 bg-white hover:shadow-lg transition"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h2 className="font-semibold text-gray-800">{p.invoiceNumber}</h2>
+                      <p className="text-xs text-gray-500">{leaseName}</p>
+                    </div>
+                    <div className="flex gap-1">
                       {!p.deleted_at ? (
                         <Button
                           className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
@@ -260,29 +280,35 @@ const PaymentPage = () => {
                         </Button>
                       )}
                     </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>
-                        <strong>Amount:</strong> {p.amount}
-                      </div>
-                      <div>
-                        <strong>Lease:</strong> {leaseName}
-                      </div>
-                      <div>
-                        <strong>Mode:</strong> {modeName}
-                      </div>
-                      {p.proofUrl && (
-                        <img
-                          src={p.proofUrl}
-                          alt="proof"
-                          className="mt-2 max-h-32 w-auto rounded-md shadow cursor-pointer"
-                          onClick={() => handleViewProof(p.proofUrl)}
-                        />
-                      )}
+                  </div>
+
+                  <div className="flex flex-col gap-1 text-sm text-gray-700">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Amount:</span>
+                      <span className="text-blue-600 font-semibold">{p.amount}</span>
                     </div>
-                  </Card>
-                );
-              })}
-            </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Lease:</span>
+                      <span>{leaseName}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">Mode:</span>
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-800 text-xs rounded-full">{modeName}</span>
+                    </div>
+                    {p.proofUrl && (
+                      <img
+                        src={p.proofUrl}
+                        alt="proof"
+                        className="mt-2 max-h-40 w-full object-contain rounded-md shadow cursor-pointer"
+                        onClick={() => handleViewProof(p.proofUrl)}
+                      />
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
           </>
         )}
       </div>
@@ -304,13 +330,8 @@ const PaymentPage = () => {
                 value: l.id,
                 label: l.localForLease?.reference_code || l.id,
               }))}
-              value={leases
-                .map((l) => ({
-                  value: l.id,
-                  label: l.localForLease?.reference_code || l.id,
-                }))
-                .find((opt) => opt.value === editData.leaseId)}
-              onChange={(opt) => setEditData({ ...editData, leaseId: opt.value })}
+              value={editData.leaseId} // just the string/number
+              onChange={(e) => setEditData({ ...editData, leaseId: e.target.value })}
             />
 
             <Select
@@ -319,11 +340,10 @@ const PaymentPage = () => {
                 value: pm.id,
                 label: pm.displayName,
               }))}
-              value={paymentModes
-                .map((pm) => ({ value: pm.id, label: pm.displayName }))
-                .find((opt) => opt.value === editData.paymentModeId)}
-              onChange={(opt) => setEditData({ ...editData, paymentModeId: opt.value })}
+              value={editData.paymentModeId}
+              onChange={(e) => setEditData({ ...editData, paymentModeId: e.target.value })}
             />
+
 
             <Input label="Proof" type="file" onChange={handleProofChange} />
             {proofPreview && (
