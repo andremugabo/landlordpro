@@ -18,7 +18,16 @@
  *           example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
  *         name:
  *           type: string
+ *           description: Representative of the company or individual tenant
  *           example: "John Doe"
+ *         company_name:
+ *           type: string
+ *           description: Name of the company
+ *           example: "Acme Corp"
+ *         tin_number:
+ *           type: string
+ *           description: Company Tax Identification Number
+ *           example: "123456789"
  *         email:
  *           type: string
  *           example: "john@example.com"
@@ -57,7 +66,7 @@
  *         name: search
  *         schema:
  *           type: string
- *         description: Search by name, email, or phone
+ *         description: Search by name, company_name, email, or phone
  *     responses:
  *       200:
  *         description: List of tenants retrieved successfully
@@ -140,6 +149,12 @@
  *               name:
  *                 type: string
  *                 example: "John Doe"
+ *               company_name:
+ *                 type: string
+ *                 example: "Acme Corp"
+ *               tin_number:
+ *                 type: string
+ *                 example: "123456789"
  *               email:
  *                 type: string
  *                 example: "john@example.com"
@@ -180,6 +195,12 @@
  *               name:
  *                 type: string
  *                 example: "Jane Doe"
+ *               company_name:
+ *                 type: string
+ *                 example: "New Corp Ltd"
+ *               tin_number:
+ *                 type: string
+ *                 example: "987654321"
  *               email:
  *                 type: string
  *                 example: "jane@example.com"
