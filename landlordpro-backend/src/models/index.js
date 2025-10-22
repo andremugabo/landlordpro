@@ -52,13 +52,13 @@ Document.belongsTo(Lease, { foreignKey: 'lease_id', as: 'leaseForDocument' });
 Tenant.hasMany(Document, { foreignKey: 'owner_id', as: 'documentsForTenant' });
 Document.belongsTo(Tenant, { foreignKey: 'owner_id', as: 'tenantForDocument' });
 
-// 💸 Property ↔ Expenses
-Property.hasMany(Expense, { foreignKey: 'property_id', as: 'expensesForProperty' });
-Expense.belongsTo(Property, { foreignKey: 'property_id', as: 'propertyForExpense' });
-
 // 💸 Local ↔ Expenses
 Local.hasMany(Expense, { foreignKey: 'local_id', as: 'expensesForLocal' });
 Expense.belongsTo(Local, { foreignKey: 'local_id', as: 'localForExpense' });
+
+// 💸 Property ↔ Expenses (optional, for direct queries)
+Property.hasMany(Expense, { foreignKey: 'property_id', as: 'expensesForProperty' });
+Expense.belongsTo(Property, { foreignKey: 'property_id', as: 'propertyForExpense' });
 
 // ====================================================== //
 

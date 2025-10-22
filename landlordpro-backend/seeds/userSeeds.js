@@ -8,22 +8,23 @@ module.exports = async function seedUsers() {
     return;
   }
 
-  const adminPass = await bcrypt.hash('admin123', 10);
-  const userPass = await bcrypt.hash('user123', 10);
+  const adminPass = await bcrypt.hash('123456', 10);
+  const normalPass = await bcrypt.hash('123456', 10);
 
+  // Make sure the enum in your DB allows 'normal' instead of 'user'
   await User.bulkCreate([
     {
-      email: 'admin@example.com',
+      email: 'admin@landlordpro.com',
       password_hash: adminPass,
       full_name: 'System Admin',
-      role: 'admin',
+      role: 'admin',      
       is_active: true,
     },
     {
-      email: 'user@example.com',
-      password_hash: userPass,
-      full_name: 'Normal User',
-      role: 'user',
+      email: 'manager@landlordpro.com',
+      password_hash: normalPass,
+      full_name: 'Manager User',
+      role: 'manager',    
       is_active: true,
     },
   ]);

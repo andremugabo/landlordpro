@@ -1,68 +1,29 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Model } = require('sequelize');
 const sequelize = require('../../db');
 
-const Expense = sequelize.define(
-  'Expense',
+class Expense extends Model {}
+
+Expense.init(
   {
-    id: { 
-      type: DataTypes.UUID, 
-      defaultValue: DataTypes.UUIDV4, 
-      primaryKey: true 
-    },
-    amount: { 
-      type: DataTypes.DECIMAL(12, 2), 
-      allowNull: false,
-      validate: {
-        isDecimal: true,
-        min: 0.01
-      }
-    },
-    category: { 
-      type: DataTypes.STRING(100), 
-      allowNull: false,
-      validate: {
-        notEmpty: true
-      }
-    },
-    description: { 
-      type: DataTypes.TEXT, 
-      allowNull: true 
-    },
-    date: { 
-      type: DataTypes.DATEONLY,  
-      defaultValue: DataTypes.NOW
-    },
-    propertyId: { 
-      type: DataTypes.UUID, 
-      allowNull: true, 
-      field: 'property_id',
-      references: {
-        model: 'properties',
-        key: 'id'
-      },
-      onUpdate: 'CASCADE',
-      onDelete: 'SET NULL'
-    },
-    localId: { 
-      type: DataTypes.UUID, 
-      allowNull: true, 
-      field: 'local_id',
-      references: {
-        model: 'locals',
-        key: 'id'
-      },
-      onUpdate: 'CASCADE',
-      onDelete: 'SET NULL'
-    }
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    description: { type: DataTypes.STRING, allowNull: false },
+    amount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+    date: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
+
+    // Foreign keys (nullable to prevent sync errors)
+    property_id: { type: DataTypes.UUID, allowNull: true },
+    local_id: { type: DataTypes.UUID, allowNull: true },
   },
   {
+    sequelize,
+    modelName: 'Expense',
     tableName: 'expenses',
     timestamps: true,
-    underscored: true,
-    indexes: [
-      { fields: ['category'] },
-      { fields: ['date'] }
-    ]
+    paranoid: true,          // enables soft delete
+    underscored: true,       // snake_case for columns
+    deletedAt: 'deleted_at',
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
   }
 );
 

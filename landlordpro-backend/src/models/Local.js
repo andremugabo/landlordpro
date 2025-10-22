@@ -32,6 +32,7 @@ Local.init(
 
     level: {
       type: DataTypes.INTEGER,
+      defaultValue: 0,
       allowNull: false,
       comment: 'Level number: -1 = basement, 0 = ground, 1 = first floor, etc.'
     },

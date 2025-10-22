@@ -109,7 +109,7 @@
  *             properties:
  *               email:
  *                 type: string
- *                 example: "andre@email.com"
+ *                 example: "admin@landlordpro.com"
  *               password:
  *                 type: string
  *                 example: "123456"

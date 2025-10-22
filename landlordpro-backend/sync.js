@@ -1,5 +1,5 @@
 const sequelize = require('./db');
-const models = require('./src/models'); // only index.js
+const models = require('./src/models');
 
 (async () => {
   try {
