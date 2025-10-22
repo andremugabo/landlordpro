@@ -3,23 +3,26 @@ const router = express.Router();
 const localController = require('../controllers/localController');
 const { authenticate, adminOnly } = require('../middleware/authMiddleware');
 
-// Locals
-router.get('/locals', authenticate, localController.getAllLocals);            
-router.get('/locals/:id', authenticate, localController.getLocalById);       
-router.post('/locals', authenticate, localController.createLocal);            
+// ✅ Get all locals (any authenticated user)
+router.get('/locals', authenticate, localController.getAllLocals);
 
-// Update a local (full update with PUT, partial update with PATCH)
-router.put('/locals/:id', authenticate, localController.updateLocal);         
-router.patch('/locals/:id', authenticate, localController.updateLocal);       
+// ✅ Get a single local by ID (any authenticated user)
+router.get('/locals/:id', authenticate, localController.getLocalById);
 
-// Soft delete a local
-router.delete('/locals/:id', authenticate, localController.deleteLocal);      
+// ✅ Create a new local (admin only)
+router.post('/locals', authenticate, adminOnly, localController.createLocal);
 
-// Admin-only: restore a soft-deleted local
+// ✅ Update a local (PUT = full update, PATCH = partial update) (admin only)
+router.put('/locals/:id', authenticate, adminOnly, localController.updateLocal);
+router.patch('/locals/:id', authenticate, adminOnly, localController.updateLocal);
+
+// ✅ Soft delete a local (admin only)
+router.delete('/locals/:id', authenticate, adminOnly, localController.deleteLocal);
+
+// ✅ Restore a soft-deleted local (admin only)
 router.patch('/locals/:id/restore', authenticate, adminOnly, localController.restoreLocal);
 
-
+// ✅ Update local status (available to authenticated users, optional adminOnly)
 router.patch('/locals/:id/status', authenticate, localController.updateLocalStatus);
-
 
 module.exports = router;

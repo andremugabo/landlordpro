@@ -22,6 +22,8 @@
  *             required:
  *               - name
  *               - location
+ *               - number_of_floors
+ *               - has_basement
  *             properties:
  *               name:
  *                 type: string
@@ -32,11 +34,17 @@
  *               description:
  *                 type: string
  *                 example: "A spacious 2-bedroom apartment"
+ *               number_of_floors:
+ *                 type: integer
+ *                 example: 3
+ *               has_basement:
+ *                 type: boolean
+ *                 example: true
  *     responses:
  *       201:
- *         description: Property created successfully
+ *         description: Property created successfully with floors
  *       400:
- *         description: Bad request
+ *         description: Bad request (validation error)
  *       401:
  *         description: Unauthorized
  *       403:
@@ -81,6 +89,9 @@
  *                 limit:
  *                   type: integer
  *                   example: 10
+ *                 totalPages:
+ *                   type: integer
+ *                   example: 5
  *                 properties:
  *                   type: array
  *                   items:
@@ -110,7 +121,7 @@
  * @swagger
  * /api/properties/{id}:
  *   get:
- *     summary: Get a property by ID
+ *     summary: Get a property by ID with floors
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
@@ -124,7 +135,7 @@
  *         description: Property ID
  *     responses:
  *       200:
- *         description: Property details
+ *         description: Property details including floors
  *       404:
  *         description: Property not found
  *       401:
@@ -141,7 +152,6 @@
  *         required: true
  *         schema:
  *           type: string
- *           example: "c1a2b3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6"
  *     requestBody:
  *       required: true
  *       content:
@@ -155,6 +165,10 @@
  *                 type: string
  *               description:
  *                 type: string
+ *               number_of_floors:
+ *                 type: integer
+ *               has_basement:
+ *                 type: boolean
  *     responses:
  *       200:
  *         description: Property updated successfully
@@ -166,7 +180,7 @@
  *         description: Forbidden (admin only)
  * 
  *   delete:
- *     summary: Delete a property (admin only)
+ *     summary: Soft-delete a property (admin only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
@@ -176,14 +190,61 @@
  *         required: true
  *         schema:
  *           type: string
- *           example: "c1a2b3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6"
  *     responses:
  *       200:
- *         description: Property deleted successfully
+ *         description: Property soft-deleted successfully
  *       404:
  *         description: Property not found
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Forbidden (admin only)
+ */
+
+/**
+ * @swagger
+ * /api/properties/{id}/floors:
+ *   get:
+ *     summary: Get all floors for a specific property
+ *     tags: [Properties]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Property ID
+ *     responses:
+ *       200:
+ *         description: List of floors for the property
+ *       404:
+ *         description: Property not found
+ *       401:
+ *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * /api/properties/{id}/locals:
+ *   get:
+ *     summary: Get all locals for a specific property
+ *     tags: [Properties]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Property ID
+ *     responses:
+ *       200:
+ *         description: List of locals for the property
+ *       404:
+ *         description: Property not found
+ *       401:
+ *         description: Unauthorized
  */

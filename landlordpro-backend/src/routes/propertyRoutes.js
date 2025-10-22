@@ -1,7 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const propertyController = require('../controllers/propertyController'); // keep as object
+
+// Controllers
+const propertyController = require('../controllers/propertyController');
+const localController = require('../controllers/localController');
+
+// Middleware
 const { authenticate, adminOnly } = require('../middleware/authMiddleware');
+
+
+
+// ------------------------
+// Property Routes
+// ------------------------
 
 // Create a new property (admin only)
 router.post('/properties', authenticate, adminOnly, propertyController.createProperty);
@@ -15,7 +26,13 @@ router.get('/properties/:id', authenticate, propertyController.getPropertyById);
 // Update a property by ID (admin only)
 router.put('/properties/:id', authenticate, adminOnly, propertyController.updateProperty);
 
-// Delete a property by ID (admin only, soft delete)
+// Soft-delete a property by ID (admin only)
 router.delete('/properties/:id', authenticate, adminOnly, propertyController.deleteProperty);
+
+// Get all floors for a specific property
+router.get('/properties/:id/floors', authenticate, propertyController.getFloorsByPropertyId);
+
+// Get all locals for a specific property
+router.get('/properties/:id/locals', authenticate, localController.getLocalsByPropertyId);
 
 module.exports = router;

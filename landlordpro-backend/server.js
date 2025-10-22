@@ -1,6 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors'); 
+const path = require('path');
 
 dotenv.config();
 
@@ -26,6 +27,10 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true, 
 }));
+
+// This line - serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname,'uploads')));
+
 
 // Routes
 app.use('/api', userRoutes);

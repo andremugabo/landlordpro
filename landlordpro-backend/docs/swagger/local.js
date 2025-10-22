@@ -69,11 +69,13 @@
  *         name: page
  *         schema:
  *           type: integer
+ *           default: 1
  *         description: Page number
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
+ *           default: 10
  *         description: Number of items per page
  *       - in: query
  *         name: propertyId
@@ -239,32 +241,17 @@
  *             properties:
  *               reference_code:
  *                 type: string
- *                 example: "LOC-102"
  *               status:
  *                 type: string
  *                 enum: ["available", "occupied", "maintenance"]
- *                 example: "occupied"
  *               size_m2:
  *                 type: number
- *                 example: 50.5
  *               property_id:
  *                 type: string
  *                 format: uuid
- *                 example: "c56a4180-65aa-42ec-a945-5fd21dec0538"
  *     responses:
  *       200:
  *         description: Local partially updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 local:
- *                   $ref: '#/components/schemas/Local'
  *       400:
  *         description: Validation error
  *       404:
@@ -319,7 +306,6 @@
  *         description: Local not found
  */
 
-
 /**
  * @swagger
  * /api/locals/{id}/status:
@@ -348,23 +334,9 @@
  *               status:
  *                 type: string
  *                 enum: ["available", "occupied", "maintenance"]
- *                 example: "occupied"
  *     responses:
  *       200:
  *         description: Local status updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Local status updated successfully"
- *                 local:
- *                   $ref: '#/components/schemas/Local'
  *       400:
  *         description: Invalid status value
  *       404:
