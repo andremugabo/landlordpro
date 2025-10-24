@@ -9,7 +9,6 @@ const Floor = require('../models/Floor');
 async function getAllLocals({ page = 1, limit = 10, propertyId = null, floorId = null } = {}) {
   const offset = (page - 1) * limit;
 
-  // Build filter
   const where = {};
   if (propertyId) where.property_id = propertyId;
   if (floorId) where.floor_id = floorId;
@@ -53,18 +52,62 @@ async function getLocalById(id) {
 }
 
 /**
+ * Helper: validate level against property
+ */
+async function validateLevel(property_id, level) {
+  const property = await Property.findByPk(property_id);
+  if (!property) throw new Error('Property not found for this local.');
+
+  if (level > property.number_of_floors) {
+    throw new Error(`Invalid level: property only has ${property.number_of_floors} floors above ground.`);
+  }
+  if (level < 0 && !property.has_basement) {
+    throw new Error('This property does not have a basement.');
+  }
+  if (level < -1) {
+    throw new Error('Invalid level: basement can only be level -1.');
+  }
+
+  // Return the floor matching the level
+  const floor = await Floor.findOne({ where: { property_id, level_number: level } });
+  if (!floor) throw new Error('Floor does not exist for this level.');
+  return floor;
+}
+
+/**
  * Create a new local
  */
-async function createLocal({ reference_code, status = 'available', size_m2, property_id, floor_id }) {
-  return await Local.create({ reference_code, status, size_m2, property_id, floor_id });
+async function createLocal({ reference_code, status = 'available', size_m2, property_id, level }) {
+  const floor = await validateLevel(property_id, level);
+
+  return await Local.create({
+    reference_code,
+    status,
+    size_m2,
+    property_id,
+    floor_id: floor.id
+  });
 }
 
 /**
  * Update a local
  */
-async function updateLocal(id, data) {
+async function updateLocal(id, { reference_code, status, size_m2, property_id, level }) {
   const local = await getLocalById(id);
-  return await local.update(data);
+
+  let floor_id = local.floor_id;
+  if (property_id && level !== undefined) {
+    const floor = await validateLevel(property_id, level);
+    floor_id = floor.id;
+  }
+
+  return await local.update({
+    reference_code: reference_code ?? local.reference_code,
+    status: status ?? local.status,
+    size_m2: size_m2 ?? local.size_m2,
+    property_id: property_id ?? local.property_id,
+    floor_id
+  });
 }
 
 /**

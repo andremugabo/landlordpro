@@ -1,7 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const Joi = require('joi');
-const Property = require('../models/Property');
-const Floor = require('../models/Floor');
+const { Property, Floor } = require('../models'); 
 
 // ✅ Validation schema
 const propertySchema = Joi.object({
@@ -12,18 +11,19 @@ const propertySchema = Joi.object({
   has_basement: Joi.boolean().required()
 });
 
-// ✅ Create a property (and its floors)
+// ✅ Create a property (with floors)
 async function createProperty(data) {
+  // Validate input
   const { error, value } = propertySchema.validate(data);
   if (error) throw new Error(error.details[0].message);
 
-  // Assign a UUID if not automatically handled by Sequelize
+  // Assign UUID
   value.id = uuidv4();
 
-  // 🏢 Create the property
+  // Create property
   const property = await Property.create(value);
 
-  // 🧱 Automatically create floor records (basement + all floors)
+  // Automatically create floors
   const floors = [];
 
   if (value.has_basement) {
@@ -48,13 +48,14 @@ async function createProperty(data) {
   await Floor.bulkCreate(floors);
 
   return {
+    success: true,
     message: 'Property created successfully with floors.',
     property,
     floors
   };
 }
 
-// ✅ Get all properties with pagination (excluding soft-deleted)
+// ✅ Get all properties
 async function getAllProperties(page = 1, limit = 10) {
   page = parseInt(page);
   limit = parseInt(limit);
@@ -79,7 +80,7 @@ async function getAllProperties(page = 1, limit = 10) {
   };
 }
 
-// ✅ Get a property by ID (with floors)
+// ✅ Get property by ID
 async function getPropertyById(id) {
   const property = await Property.findOne({
     where: { id, deleted_at: null },
@@ -95,23 +96,92 @@ async function getPropertyById(id) {
   return property;
 }
 
-// ✅ Update a property (with validation)
+// ✅ Update property
+// ✅ Update property and sync floors
 async function updateProperty(id, data) {
   const { error, value } = propertySchema.validate(data, { presence: 'optional', abortEarly: false });
   if (error) throw new Error(error.details[0].message);
 
-  const property = await Property.findOne({ where: { id, deleted_at: null } });
+  // Find property
+  const property = await Property.findOne({
+    where: { id, deleted_at: null },
+    include: [{ model: Floor, as: 'floorsForProperty' }]
+  });
+
   if (!property) {
-    const error = new Error('Property not found');
-    error.status = 404;
-    throw error;
+    const err = new Error('Property not found');
+    err.status = 404;
+    throw err;
   }
 
+  // Save old values before update
+  const oldNumFloors = property.number_of_floors;
+  const oldHasBasement = property.has_basement;
+
+  // Update property
   await property.update(value);
-  return property;
+
+  // Fetch updated property values
+  const newNumFloors = property.number_of_floors;
+  const newHasBasement = property.has_basement;
+
+  // ===============================
+  // 🧱 FLOOR SYNCHRONIZATION LOGIC
+  // ===============================
+  const { Op } = require('sequelize');
+
+  // ✅ Handle basement addition/removal
+  if (newHasBasement && !oldHasBasement) {
+    // Add basement
+    await Floor.create({
+      id: uuidv4(),
+      property_id: property.id,
+      level_number: -1,
+      name: 'Basement'
+    });
+  } else if (!newHasBasement && oldHasBasement) {
+    // Remove basement
+    await Floor.destroy({
+      where: { property_id: property.id, level_number: -1 }
+    });
+  }
+
+  // ✅ Handle change in number of floors above ground
+  if (newNumFloors > oldNumFloors) {
+    // Add new floors
+    for (let i = oldNumFloors + 1; i <= newNumFloors; i++) {
+      await Floor.create({
+        id: uuidv4(),
+        property_id: property.id,
+        level_number: i,
+        name: i === 0 ? 'Ground Floor' : `Floor ${i}`
+      });
+    }
+  } else if (newNumFloors < oldNumFloors) {
+    // Remove extra floors
+    await Floor.destroy({
+      where: {
+        property_id: property.id,
+        level_number: { [Op.gt]: newNumFloors }
+      }
+    });
+  }
+
+  // ✅ Return updated property
+  const updated = await Property.findOne({
+    where: { id },
+    include: [{ model: Floor, as: 'floorsForProperty' }]
+  });
+
+  return {
+    success: true,
+    message: 'Property and floors updated successfully.',
+    property: updated
+  };
 }
 
-// ✅ Soft-delete a property (mark deleted_at)
+
+// ✅ Soft delete property
 async function deleteProperty(id) {
   const property = await Property.findOne({ where: { id, deleted_at: null } });
   if (!property) {

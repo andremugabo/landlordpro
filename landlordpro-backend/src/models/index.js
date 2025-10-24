@@ -24,7 +24,7 @@ Floor.belongsTo(Property, { foreignKey: 'property_id', as: 'propertyForFloor' })
 Floor.hasMany(Local, { foreignKey: 'floor_id', as: 'localsForFloor' });
 Local.belongsTo(Floor, { foreignKey: 'floor_id', as: 'floor' });
 
-// 🏠 Property ↔ Locals (direct link for convenience)
+// 🏠 Property ↔ Locals
 Property.hasMany(Local, { foreignKey: 'property_id', as: 'localsForProperty' });
 Local.belongsTo(Property, { foreignKey: 'property_id', as: 'property' });
 
@@ -56,29 +56,29 @@ Document.belongsTo(Tenant, { foreignKey: 'owner_id', as: 'tenantForDocument' });
 Local.hasMany(Expense, { foreignKey: 'local_id', as: 'expensesForLocal' });
 Expense.belongsTo(Local, { foreignKey: 'local_id', as: 'localForExpense' });
 
-// 💸 Property ↔ Expenses (optional, for direct queries)
+// 💸 Property ↔ Expenses
 Property.hasMany(Expense, { foreignKey: 'property_id', as: 'expensesForProperty' });
 Expense.belongsTo(Property, { foreignKey: 'property_id', as: 'propertyForExpense' });
 
 // ====================================================== //
 
-// 🏗️ Auto-create floors after a property is created
-Property.addHook('afterCreate', async (property) => {
-  const floors = [];
+// // 🏗️ Auto-create floors after a property is created
+// Property.addHook('afterCreate', async (property) => {
+//   const floors = [];
 
-  if (property.has_basement) {
-    floors.push({ level_number: -1, name: 'Basement', property_id: property.id });
-  }
+//   if (property.has_basement) {
+//     floors.push({ level_number: -1, name: 'Basement', property_id: property.id });
+//   }
 
-  floors.push({ level_number: 0, name: 'Ground Floor', property_id: property.id });
+//   floors.push({ level_number: 0, name: 'Ground Floor', property_id: property.id });
 
-  for (let i = 1; i <= property.number_of_floors; i++) {
-    floors.push({ level_number: i, name: `${i}° Floor`, property_id: property.id });
-  }
+//   for (let i = 1; i <= property.number_of_floors; i++) {
+//     floors.push({ level_number: i, name: `${i}° Floor`, property_id: property.id });
+//   }
 
-  const { Floor } = require('./Floor');
-  await Floor.bulkCreate(floors);
-});
+//   // ✅ Use the already imported Floor model
+//   await Floor.bulkCreate(floors);
+// });
 
 module.exports = {
   User,
