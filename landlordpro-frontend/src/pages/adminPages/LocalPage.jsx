@@ -17,7 +17,13 @@ const LocalPage = () => {
   const [properties, setProperties] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedLocal, setSelectedLocal] = useState(null);
-  const [editData, setEditData] = useState({ reference_code: '', status: 'available', size_m2: '', property_id: '' });
+  const [editData, setEditData] = useState({ 
+    reference_code: '', 
+    status: 'available', 
+    size_m2: '', 
+    property_id: '', 
+    level: '' 
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -39,7 +45,7 @@ const LocalPage = () => {
     }
   };
 
-  // Fetch properties for Select dropdown
+  // Fetch properties
   const fetchProperties = async () => {
     try {
       const data = await getAllProperties(1, 100);
@@ -54,38 +60,41 @@ const LocalPage = () => {
     fetchProperties();
   }, [page]);
 
+  // Edit modal open
   const handleEditClick = (local) => {
     setSelectedLocal(local);
     setEditData({
       reference_code: local.reference_code,
       status: local.status,
       size_m2: local.size_m2,
-      property_id: local.property_id
+      property_id: local.property_id,
+      level: local.level || ''
     });
     setModalOpen(true);
   };
 
+  // Create or update local
   const handleSubmit = async () => {
-    const { reference_code, status, size_m2, property_id } = editData;
+    const { reference_code, status, size_m2, property_id, level } = editData;
 
-    if (!reference_code?.trim() || !property_id) {
-      showError('Reference code and property are required.');
+    if (!reference_code?.trim() || !property_id || !level?.trim()) {
+      showError('Reference code, property, and level are required.');
       return;
     }
 
     try {
       if (selectedLocal) {
-        await updateLocal(selectedLocal.id, { reference_code, status, size_m2, property_id });
+        await updateLocal(selectedLocal.id, { reference_code, status, size_m2, property_id, level });
         showSuccess('Local updated successfully!');
       } else {
-        await createLocal({ reference_code, status, size_m2, property_id });
+        await createLocal({ reference_code, status, size_m2, property_id, level });
         showSuccess('Local added successfully!');
         setPage(1);
       }
       fetchLocals(page);
       setModalOpen(false);
       setSelectedLocal(null);
-      setEditData({ reference_code: '', status: 'available', size_m2: '', property_id: '' });
+      setEditData({ reference_code: '', status: 'available', size_m2: '', property_id: '', level: '' });
     } catch (err) {
       showError(err?.message || 'Failed to save local');
     }
@@ -122,11 +131,12 @@ const LocalPage = () => {
     }
   };
 
+  // Search filter
   const filteredLocals = useMemo(() => {
     if (!Array.isArray(locals)) return [];
     return locals.filter(l =>
       l.reference_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (l.property?.name?.toLowerCase().includes(searchTerm.toLowerCase()))
+      l.property?.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [locals, searchTerm]);
 
@@ -142,7 +152,7 @@ const LocalPage = () => {
           className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm transition w-full sm:w-auto justify-center"
           onClick={() => {
             setSelectedLocal(null);
-            setEditData({ reference_code: '', status: 'available', size_m2: '', property_id: '' });
+            setEditData({ reference_code: '', status: 'available', size_m2: '', property_id: '', level: '' });
             setModalOpen(true);
           }}
         >
@@ -173,6 +183,7 @@ const LocalPage = () => {
                 <tr>
                   <th className="p-3 font-semibold text-left">Reference</th>
                   <th className="p-3 font-semibold text-left">Property</th>
+                  <th className="p-3 font-semibold text-left">Level</th>
                   <th className="p-3 font-semibold text-left">Size (m²)</th>
                   <th className="p-3 font-semibold text-left">Status</th>
                   <th className="p-3 text-center font-semibold">Actions</th>
@@ -181,13 +192,14 @@ const LocalPage = () => {
               <tbody>
                 {filteredLocals.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-gray-500">No locals found</td>
+                    <td colSpan={6} className="p-6 text-center text-gray-500">No locals found</td>
                   </tr>
                 ) : (
                   filteredLocals.map(local => (
                     <tr key={local.id} className="hover:bg-gray-50 transition-colors">
                       <td className="p-3 font-medium text-gray-800">{local.reference_code}</td>
                       <td className="p-3">{local.property?.name || '-'}</td>
+                      <td className="p-3">{local.level || '-'}</td>
                       <td className="p-3">{local.size_m2 || '-'}</td>
                       <td className="p-3">
                         <Select
@@ -232,7 +244,7 @@ const LocalPage = () => {
         </Card>
       </div>
 
-      {/* Pagination */}
+      {/* ✅ Pagination Section */}
       <div className="flex justify-between items-center gap-2 px-4 py-3 border-t border-gray-100 bg-white text-sm text-gray-600 rounded-lg shadow-sm">
         <div className="text-gray-500">
           Page <span className="font-medium">{page}</span> of <span className="font-medium">{totalPages}</span>
@@ -241,7 +253,11 @@ const LocalPage = () => {
           <button
             onClick={() => setPage(prev => Math.max(prev - 1, 1))}
             disabled={page <= 1}
-            className={`px-3 py-1 rounded-md border text-xs font-medium transition ${page <= 1 ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+            className={`px-3 py-1 rounded-md border text-xs font-medium transition ${
+              page <= 1 
+                ? 'text-gray-300 border-gray-200 cursor-not-allowed' 
+                : 'text-gray-700 border-gray-300 hover:bg-gray-100'
+            }`}
           >
             ← Prev
           </button>
@@ -249,7 +265,11 @@ const LocalPage = () => {
           <button
             onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
             disabled={page >= totalPages}
-            className={`px-3 py-1 rounded-md border text-xs font-medium transition ${page >= totalPages ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+            className={`px-3 py-1 rounded-md border text-xs font-medium transition ${
+              page >= totalPages 
+                ? 'text-gray-300 border-gray-200 cursor-not-allowed' 
+                : 'text-gray-700 border-gray-300 hover:bg-gray-100'
+            }`}
           >
             Next →
           </button>
@@ -268,6 +288,11 @@ const LocalPage = () => {
               label="Reference Code"
               value={editData.reference_code}
               onChange={(e) => setEditData({ ...editData, reference_code: e.target.value })}
+            />
+            <Input
+              label="Level"
+              value={editData.level}
+              onChange={(e) => setEditData({ ...editData, level: e.target.value })}
             />
             <Input
               label="Size (m²)"

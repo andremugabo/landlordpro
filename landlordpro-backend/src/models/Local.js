@@ -45,7 +45,7 @@ Local.init(
 
     floor_id: {
       type: DataTypes.UUID,
-      allowNull: true, // will be set automatically before creation
+      allowNull: false, // will be set automatically before creation
       references: { model: 'floors', key: 'id' }
     }
   },

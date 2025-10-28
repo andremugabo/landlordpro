@@ -78,22 +78,55 @@ async function validateLevel(property_id, level) {
  * Create a new local
  */
 async function createLocal({ reference_code, status = 'available', size_m2, property_id, level }) {
-  const floor = await validateLevel(property_id, level);
+  // Check for duplicate reference_code
+  const existing = await Local.findOne({ where: { reference_code } });
+  if (existing) {
+    const err = new Error(`A local with reference code "${reference_code}" already exists.`);
+    err.status = 400;
+    throw err;
+  }
 
+  // Validate level and get corresponding floor
+  if (level === undefined || level === null) {
+    const err = new Error('Level is required');
+    err.status = 400;
+    throw err;
+  }
+
+  const floor = await Floor.findOne({ where: { property_id, level_number: level } });
+  if (!floor) {
+    const err = new Error('Floor not found for the given property and level');
+    err.status = 400;
+    throw err;
+  }
+
+  // Create the local using the floor's ID
   return await Local.create({
     reference_code,
     status,
     size_m2,
+    level: floor.level_number,
     property_id,
-    floor_id: floor.id
+    floor_id: floor.id,
   });
 }
+
 
 /**
  * Update a local
  */
 async function updateLocal(id, { reference_code, status, size_m2, property_id, level }) {
   const local = await getLocalById(id);
+
+  // Check for duplicate reference_code if it's being updated
+  if (reference_code && reference_code !== local.reference_code) {
+    const existing = await Local.findOne({ where: { reference_code } });
+    if (existing) {
+      const err = new Error(`A local with reference code "${reference_code}" already exists.`);
+      err.status = 400;
+      throw err;
+    }
+  }
 
   let floor_id = local.floor_id;
   if (property_id && level !== undefined) {
@@ -105,10 +138,12 @@ async function updateLocal(id, { reference_code, status, size_m2, property_id, l
     reference_code: reference_code ?? local.reference_code,
     status: status ?? local.status,
     size_m2: size_m2 ?? local.size_m2,
+    level: level ?? local.level,
     property_id: property_id ?? local.property_id,
     floor_id
   });
 }
+
 
 /**
  * Soft delete a local

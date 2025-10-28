@@ -13,7 +13,7 @@ class FloorService {
         {
           model: Property,
           as: 'propertyForFloor',
-          attributes: ['id', 'name'], // only include needed fields
+          attributes: ['id', 'name'],
         },
       ],
       order: [['level_number', 'ASC']],

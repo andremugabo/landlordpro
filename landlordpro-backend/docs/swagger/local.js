@@ -30,6 +30,9 @@
  *           type: string
  *           format: uuid
  *           example: "c56a4180-65aa-42ec-a945-5fd21dec0538"
+ *         level:
+ *           type: integer
+ *           example: 0
  *         created_at:
  *           type: string
  *           format: date-time
@@ -38,6 +41,8 @@
  *           format: date-time
  *         property:
  *           $ref: '#/components/schemas/Property'
+ *         floor:
+ *           $ref: '#/components/schemas/Floor'
  *     Property:
  *       type: object
  *       properties:
@@ -54,13 +59,30 @@
  *         description:
  *           type: string
  *           example: "Luxury apartments in the city center"
+ *     Floor:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *           example: "d94a1b2c-1234-4ef7-89ab-5678cdef0123"
+ *         name:
+ *           type: string
+ *           example: "Ground Floor"
+ *         level_number:
+ *           type: integer
+ *           example: 0
+ *         property_id:
+ *           type: string
+ *           format: uuid
+ *           example: "c56a4180-65aa-42ec-a945-5fd21dec0538"
  */
 
 /**
  * @swagger
  * /api/locals:
  *   get:
- *     summary: Get all locals with pagination and optional property filter
+ *     summary: Get all locals with pagination and optional filtering
  *     tags: [Locals]
  *     security:
  *       - bearerAuth: []
@@ -83,6 +105,11 @@
  *           type: string
  *           format: uuid
  *         description: Filter locals by property ID
+ *       - in: query
+ *         name: level
+ *         schema:
+ *           type: integer
+ *         description: Filter locals by level
  *     responses:
  *       200:
  *         description: List of locals
@@ -154,6 +181,7 @@
  *             required:
  *               - reference_code
  *               - property_id
+ *               - level
  *             properties:
  *               reference_code:
  *                 type: string
@@ -169,9 +197,23 @@
  *                 type: string
  *                 format: uuid
  *                 example: "c56a4180-65aa-42ec-a945-5fd21dec0538"
+ *               level:
+ *                 type: integer
+ *                 example: 0
  *     responses:
  *       201:
  *         description: Local created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 local:
+ *                   $ref: '#/components/schemas/Local'
  *       400:
  *         description: Validation error
  */
@@ -209,6 +251,8 @@
  *               property_id:
  *                 type: string
  *                 format: uuid
+ *               level:
+ *                 type: integer
  *     responses:
  *       200:
  *         description: Local updated successfully
@@ -249,6 +293,8 @@
  *               property_id:
  *                 type: string
  *                 format: uuid
+ *               level:
+ *                 type: integer
  *     responses:
  *       200:
  *         description: Local partially updated successfully
@@ -341,4 +387,38 @@
  *         description: Invalid status value
  *       404:
  *         description: Local not found
+ */
+
+/**
+ * @swagger
+ * /api/locals/property/{propertyId}:
+ *   get:
+ *     summary: Get all locals for a specific property
+ *     tags: [Locals]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: propertyId
+ *         required: true
+ *         description: ID of the property
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: List of locals for the property
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 locals:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Local'
+ *       404:
+ *         description: Property not found or no locals available
  */

@@ -5,7 +5,7 @@ import {
   deleteFloor, 
   getAllFloorsOccupancy 
 } from '../../services/floorService';
-import { Button, Modal, Input, Card } from '../../components';
+import { Button, Modal, Input } from '../../components';
 import { FiEdit, FiTrash, FiSearch } from 'react-icons/fi';
 import { showSuccess, showError, showInfo } from '../../utils/toastHelper';
 
@@ -21,7 +21,6 @@ const FloorPage = () => {
   const [limit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Fetch floors with occupancy reports
   const fetchFloors = async () => {
     try {
       setLoading(true);
@@ -42,29 +41,20 @@ const FloorPage = () => {
     }
   };
 
-  useEffect(() => {
-    fetchFloors();
-  }, []);
+  useEffect(() => { fetchFloors(); }, []);
 
-  // Open modal for edit
   const handleEditClick = (floor) => {
     setSelectedFloor(floor);
-    setEditData({ 
-      name: floor.name, 
-      level_number: floor.level_number, 
-      property_id: floor.property_id 
-    });
+    setEditData({ name: floor.name, level_number: floor.level_number, property_id: floor.property_id });
     setModalOpen(true);
   };
 
-  // Submit update
   const handleSubmit = async () => {
     const { name, level_number, property_id } = editData;
     if (!name?.trim() || !property_id?.trim()) {
       showError('Name and Property ID are required.');
       return;
     }
-
     try {
       if (selectedFloor) {
         await updateFloor(selectedFloor.id, {
@@ -73,9 +63,7 @@ const FloorPage = () => {
           property_id: property_id.trim(),
         });
         showSuccess('Floor updated successfully!');
-      } else {
-        showError('Floor creation is not implemented yet.');
-      }
+      } else showError('Floor creation is not implemented yet.');
       fetchFloors();
       setModalOpen(false);
       setSelectedFloor(null);
@@ -86,10 +74,8 @@ const FloorPage = () => {
     }
   };
 
-  // Delete floor
   const handleDelete = async (floor) => {
     if (!window.confirm('Are you sure you want to delete this floor?')) return;
-
     try {
       await deleteFloor(floor.id);
       showInfo('Floor deleted successfully.');
@@ -100,12 +86,11 @@ const FloorPage = () => {
     }
   };
 
-  // Filter floors by search term
   const filteredFloors = useMemo(() => {
     if (!Array.isArray(floors)) return [];
     return floors.filter(f =>
       f.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.propertyForFloor?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      f?.property_name?.toLowerCase().includes(searchTerm.toLowerCase())
     ).slice((page - 1) * limit, page * limit);
   }, [floors, searchTerm, page, limit]);
 
@@ -131,8 +116,49 @@ const FloorPage = () => {
         />
       </div>
 
-      {/* Floor List */}
-      <div className="grid gap-4">
+      {/* Desktop Table */}
+      <div className="hidden md:block bg-white rounded-xl shadow-md border border-gray-100 overflow-x-auto">
+        {loading ? (
+          <div className="p-8 text-center text-gray-500">Loading floors...</div>
+        ) : filteredFloors.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">No floors found</div>
+        ) : (
+          <table className="min-w-full text-sm text-gray-700">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 text-xs uppercase">
+              <tr>
+                <th className="p-3 font-semibold text-left">Name</th>
+                <th className="p-3 font-semibold text-left">Level</th>
+                <th className="p-3 font-semibold text-left">Property</th>
+                <th className="p-3 font-semibold text-left">Total Locals</th>
+                <th className="p-3 font-semibold text-left">Occupied</th>
+                <th className="p-3 font-semibold text-left">Available</th>
+                <th className="p-3 font-semibold text-left">Maintenance</th>
+                <th className="p-3 font-semibold text-left">Occupancy %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredFloors.map(floor => {
+                const report = occupancyReports[floor.id] || {};
+                return (
+                  <tr key={floor.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="p-3 font-medium text-gray-800">{floor.name}</td>
+                    <td className="p-3">{floor.level_number}</td>
+                    <td className="p-3">{floor?.property_name || '-'}</td>
+                    <td className="p-3">{report.total_locals || 0}</td>
+                    <td className="p-3">{report.occupied || 0}</td>
+                    <td className="p-3">{report.available || 0}</td>
+                    <td className="p-3">{report.maintenance || 0}</td>
+                    <td className="p-3">{report.occupancy_rate ?? 0}%</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden grid gap-4">
         {loading ? (
           <div className="p-8 text-center text-gray-500 bg-white rounded-xl shadow-md border border-gray-100">
             Loading floors...
@@ -145,37 +171,17 @@ const FloorPage = () => {
           filteredFloors.map(floor => {
             const report = occupancyReports[floor.id] || {};
             return (
-              <Card key={floor.id} className="bg-white rounded-xl shadow-md border border-gray-100 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
-                  <div className="text-gray-800 font-medium">{floor.name}</div>
-                  <div className="text-gray-600 text-sm">Level: {floor.level_number}</div>
-                  <div className="text-gray-600 text-sm">Property: {floor?.property_name || '-'}</div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-gray-600 text-sm">
-                  <div>Total Locals: {report.total_locals || 0}</div>
-                  <div>Occupied: {report.occupied || 0}</div>
-                  <div>Available: {report.available || 0}</div>
-                  <div>Maintenance: {report.maintenance || 0}</div>
-                  <div>Occupancy: {report.occupancy_rate ?? 0}%</div>
-                </div>
-
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1"
-                    onClick={() => handleEditClick(floor)}
-                  >
-                    <FiEdit className="text-sm" /> Edit
-                  </Button>
-                  <Button
-                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1"
-                    onClick={() => handleDelete(floor)}
-                  >
-                    <FiTrash className="text-sm" /> Delete
-                  </Button>
-                </div>
-              </Card>
-            );
+              <div key={floor.id} className="bg-white rounded-xl shadow-md border border-gray-100 p-4 flex flex-col gap-2">
+                <div className="text-gray-800 font-medium">{floor.name}</div>
+                <div className="text-gray-600 text-sm">Level: {floor.level_number}</div>
+                <div className="text-gray-600 text-sm">Property: {floor?.property_name || '-'}</div>
+                <div className="text-gray-600 text-sm">Total Locals: {report.total_locals || 0}</div>
+                <div className="text-gray-600 text-sm">Occupied: {report.occupied || 0}</div>
+                <div className="text-gray-600 text-sm">Available: {report.available || 0}</div>
+                <div className="text-gray-600 text-sm">Maintenance: {report.maintenance || 0}</div>
+                <div className="text-gray-600 text-sm">Occupancy: {report.occupancy_rate ?? 0}%</div>
+              </div>
+            )
           })
         )}
       </div>
