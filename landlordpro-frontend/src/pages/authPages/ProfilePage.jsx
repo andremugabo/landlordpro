@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Card, Button, Input, Modal } from "../../components";
 import { FiEdit, FiMail, FiPhone, FiCamera, FiUser, FiX } from "react-icons/fi";
 import defaultAvatar from "../../assets/react.svg";
-import { getProfile, updateProfile, uploadAvatar } from "../../services/UserService";
+import { getProfile, updateProfile, uploadAvatar } from "../../services/userService";
 import { showSuccess, showError } from "../../utils/toastHelper";
 
 const ProfilePage = () => {

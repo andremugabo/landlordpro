@@ -21,6 +21,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Pages.AdminDashboard /> }, 
       { path: '/admin/adminUsers', element: <Pages.AdminUsersPage /> },
       { path: '/admin/properties', element: <Pages.PropertyPage /> },
+      { path: '/admin/floors', element: <Pages.FloorPage /> },
       { path: '/admin/locals', element: <Pages.LocalPage /> },
       { path: '/admin/tenants', element: <Pages.TenantPage/>},
       { path: '/admin/leases', element: <Pages.LeasePage/>},

@@ -8,39 +8,41 @@ Floor.init(
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
+      primaryKey: true,
     },
 
     level_number: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      comment: 'Level number: -1 = basement, 0 = ground, 1 = first floor, etc.'
+      validate: { isInt: true },
+      comment: 'Level number: -1 = basement, 0 = ground, 1 = first floor, etc.',
     },
 
     name: {
       type: DataTypes.STRING,
       allowNull: false,
-      comment: 'Human-readable name, e.g., "Basement", "Ground Floor", "1st Floor"'
+      validate: { len: [2, 50] },
+      comment: 'Human-readable name, e.g., "Basement", "Ground Floor", "1st Floor"',
     },
 
     property_id: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: 'properties', key: 'id' }
+      references: { model: 'properties', key: 'id' },
     },
 
     created_at: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
+      defaultValue: DataTypes.NOW,
     },
     updated_at: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
+      defaultValue: DataTypes.NOW,
     },
     deleted_at: {
       type: DataTypes.DATE,
-      allowNull: true
-    }
+      allowNull: true,
+    },
   },
   {
     sequelize,
@@ -48,10 +50,10 @@ Floor.init(
     tableName: 'floors',
     underscored: true,
     timestamps: true,
+    paranoid: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    paranoid: true,
-    deletedAt: 'deleted_at'
+    deletedAt: 'deleted_at',
   }
 );
 

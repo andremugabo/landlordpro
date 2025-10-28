@@ -14,6 +14,7 @@ export { default as LeasePage } from './adminPages/LeasePage'
 export { default as PaymentModePage } from './adminPages/PaymentModePage'
 export { default as PaymentPage } from './adminPages/PaymentPage'
 export { default as ExpensePage } from './adminPages/ExpensePage'
+export { default as FloorPage } from './adminPages/FloorPage'
 
 // Manager pages
 export { default as ManagerDashboard } from './managerPages/ManagerDashboard'

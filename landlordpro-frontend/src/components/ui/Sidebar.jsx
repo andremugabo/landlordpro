@@ -1,12 +1,13 @@
 // Sidebar.jsx
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Building, Users, FileText, DollarSign, Settings, BrickWall, CreditCard } from 'lucide-react';
+import { Home, Building, Users, FileText, DollarSign, Settings, BrickWall, CreditCard, StoreIcon } from 'lucide-react';
 
 const ICONS = {
   Dashboard: Home,
   Users: Users,
   Properties: Building,
+  Floor: StoreIcon,
   Locals: BrickWall,
   Tenants: Users,
   Leases: FileText,
