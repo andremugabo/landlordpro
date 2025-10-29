@@ -17,12 +17,19 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ⚠️ Handle global 401 errors
+// ⚠️ Handle global 401 errors (optional redirect to login)
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) console.error('Unauthorized: please log in.');
-    return Promise.reject(error.response?.data || error);
+    if (error.response?.status === 401) {
+      console.error('Unauthorized: please log in.');
+      localStorage.removeItem('token');
+      // Optionally redirect
+      // window.location.href = '/login';
+    }
+
+    const errMessage = error.response?.data?.message || 'Something went wrong';
+    return Promise.reject({ message: errMessage, status: error.response?.status || 500 });
   }
 );
 
@@ -51,7 +58,7 @@ export const getTenantById = async (id) => {
 
 /**
  * ➕ Create new tenant
- * @param {object} data - { name, email, phone }
+ * @param {object} data - { name, email, phone, company_name?, tin_number? }
  */
 export const createTenant = async (data) => {
   const response = await axiosInstance.post('/', data);
@@ -61,7 +68,7 @@ export const createTenant = async (data) => {
 /**
  * ✏️ Update tenant
  * @param {string} id
- * @param {object} data
+ * @param {object} data - { name, email, phone, company_name?, tin_number? }
  */
 export const updateTenant = async (id, data) => {
   const response = await axiosInstance.put(`/${id}`, data);
@@ -74,7 +81,7 @@ export const updateTenant = async (id, data) => {
  */
 export const deleteTenant = async (id) => {
   const response = await axiosInstance.delete(`/${id}`);
-  return response.data.message; 
+  return response.data.message;
 };
 
 /**
