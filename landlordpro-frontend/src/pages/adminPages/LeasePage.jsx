@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import leaseService from '../../services/leaseService';
 import { getAllTenants } from '../../services/tenantService';
 import { getAllLocals } from '../../services/localService';
+import { getAllProperties } from '../../services/propertyService';
 import { Button, Input, Modal, Card, Select } from '../../components';
 import { FiEdit, FiPlus, FiTrash, FiSearch, FiDownload, FiClock } from 'react-icons/fi';
 import { showSuccess, showError, showInfo } from '../../utils/toastHelper';
@@ -10,6 +11,8 @@ const LeasePage = () => {
   const [leases, setLeases] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [locals, setLocals] = useState([]);
+  const [filteredLocals, setFilteredLocals] = useState([]);
+  const [properties, setProperties] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedLease, setSelectedLease] = useState(null);
   const [editData, setEditData] = useState({
@@ -17,6 +20,7 @@ const LeasePage = () => {
     endDate: '',
     status: 'active',
     tenantId: '',
+    propertyId: '',
     localId: '',
     leaseAmount: '',
   });
@@ -39,6 +43,15 @@ const LeasePage = () => {
     }
   };
 
+  const fetchPropertiesData = async () => {
+    try {
+      const res = await getAllProperties(1, 100);
+      setProperties(res.properties || []);
+    } catch {
+      showError('Failed to fetch properties');
+    }
+  };
+
   // ✅ Fetch leases
   const fetchLeases = async (pageNumber = 1, filterStatus = '', term = '') => {
     try {
@@ -57,6 +70,7 @@ const LeasePage = () => {
 
   useEffect(() => {
     fetchTenantsAndLocals();
+    fetchPropertiesData();
   }, []);
 
   useEffect(() => {
@@ -64,7 +78,7 @@ const LeasePage = () => {
   }, [page, statusFilter, searchTerm]);
 
   const tenantsOptions = tenants.map(t => ({ value: t.id, label: t.name }));
-  const localsOptions = locals.map(l => ({ value: l.id, label: l.reference_code }));
+  const propertiesOptions = properties.map(p => ({ value: p.id, label: p.name }));
 
   const filteredLeases = useMemo(
     () =>
@@ -79,11 +93,20 @@ const LeasePage = () => {
   // ✅ Edit Lease
   const handleEditClick = lease => {
     setSelectedLease(lease);
+    
+    // Filter locals based on the lease's property
+    const propertyId = lease.local?.property_id || lease.local?.propertyId || '';
+    const localsForProperty = locals.filter(l => 
+      (l.property_id || l.propertyId) === propertyId
+    );
+    setFilteredLocals(localsForProperty);
+    
     setEditData({
       startDate: lease.startDate?.split('T')[0] || '',
       endDate: lease.endDate?.split('T')[0] || '',
       status: lease.status || 'active',
       tenantId: lease.tenant?.id || '',
+      propertyId: propertyId,
       localId: lease.local?.id || '',
       leaseAmount: lease.leaseAmount || '',
     });
@@ -93,6 +116,7 @@ const LeasePage = () => {
   // ✅ Submit (Create or Update)
   const handleSubmit = async () => {
     const { startDate, endDate, status, tenantId, localId, leaseAmount } = editData;
+    console.log(editData)
     if (!startDate || !endDate || !tenantId || !localId || !leaseAmount) {
       showError('All fields are required');
       return;
@@ -128,9 +152,11 @@ const LeasePage = () => {
         endDate: '',
         status: 'active',
         tenantId: '',
+        propertyId: '',
         localId: '',
         leaseAmount: '',
       });
+      setFilteredLocals([]);
     } catch {
       showError('Failed to save lease');
     }
@@ -205,9 +231,11 @@ const LeasePage = () => {
                 endDate: '',
                 status: 'active',
                 tenantId: '',
+                propertyId: '',
                 localId: '',
                 leaseAmount: '',
               });
+              setFilteredLocals([]);
               setModalOpen(true);
             }}
             className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm"
@@ -329,6 +357,9 @@ const LeasePage = () => {
                         {lease.tenant?.name || '-'}
                       </div>
                       <div className="text-sm text-gray-500">{lease.local?.referenceCode || '-'}</div>
+                      {lease.reference && (
+                        <div className="text-xs text-gray-400">Ref: {lease.reference}</div>
+                      )}
                     </div>
                     {statusBadge(lease.status)}
                   </div>
@@ -343,7 +374,7 @@ const LeasePage = () => {
                     </div>
                     <div>
                       <div className="text-gray-500 text-xs">Duration</div>
-                      <div className="font-medium text-gray-800">
+                      <div className="font-medium text-gray-800 text-xs">
                         {lease.startDate?.split('T')[0]} to {lease.endDate?.split('T')[0]}
                       </div>
                     </div>
@@ -407,7 +438,10 @@ const LeasePage = () => {
       {modalOpen && (
         <Modal
           title={selectedLease ? 'Edit Lease' : 'Add New Lease'}
-          onClose={() => setModalOpen(false)}
+          onClose={() => {
+            setModalOpen(false);
+            setFilteredLocals([]);
+          }}
           onSubmit={handleSubmit}
         >
           <div className="space-y-4">
@@ -429,6 +463,7 @@ const LeasePage = () => {
               value={editData.leaseAmount}
               onChange={e => setEditData({ ...editData, leaseAmount: e.target.value })}
             />
+        
             <Select
               label="Tenant"
               value={tenantsOptions.find(t => t.value === editData.tenantId) || null}
@@ -437,21 +472,38 @@ const LeasePage = () => {
               placeholder="Select Tenant..."
               isSearchable
             />
+        
             <Select
-              label="Local"
-              value={localsOptions.find(l => l.value === editData.localId) || null}
-              onChange={selected => setEditData({ ...editData, localId: selected?.value || '' })}
-              options={localsOptions}
-              placeholder="Select Local..."
+              label="Property"
+              value={propertiesOptions.find(p => p.value === editData.propertyId) || null}
+              onChange={selected => {
+                const propertyId = selected?.value || '';
+                setEditData({ ...editData, propertyId, localId: '' });
+                const localsForProperty = locals.filter(l => 
+                  (l.property_id || l.propertyId) === propertyId
+                );
+                setFilteredLocals(localsForProperty);
+              }}
+              options={propertiesOptions}
+              placeholder="Select Property..."
               isSearchable
             />
+        
+            <Select
+              label="Local"
+              value={filteredLocals.map(l => ({ value: l.id, label: l.reference_code })).find(l => l.value === editData.localId) || null}
+              onChange={selected => setEditData({ ...editData, localId: selected?.value || '' })}
+              options={filteredLocals.map(l => ({ value: l.id, label: l.reference_code }))}
+              placeholder={editData.propertyId ? "Select Local..." : "Please select a property first"}
+              isSearchable
+              isDisabled={!editData.propertyId}
+            />
+        
             <Select
               label="Status"
               value={{
                 value: editData.status || 'active',
-                label:
-                  (editData.status || 'active').charAt(0).toUpperCase() +
-                  (editData.status || 'active').slice(1),
+                label: (editData.status || 'active').charAt(0).toUpperCase() + (editData.status || 'active').slice(1),
               }}
               options={[
                 { value: 'active', label: 'Active' },

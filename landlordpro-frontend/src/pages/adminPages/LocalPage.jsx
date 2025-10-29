@@ -81,6 +81,7 @@ const LocalPage = () => {
       } else {
         await createLocal(editData);
         showSuccess('Local added successfully!');
+        fetchLocals(1);
         setPage(1);
       }
       fetchLocals(page);
@@ -306,8 +307,24 @@ const LocalPage = () => {
             <Input label="Reference Code" value={editData.reference_code} onChange={(e) => setEditData({ ...editData, reference_code: e.target.value })} />
             <Input label="Level" value={editData.level} onChange={(e) => setEditData({ ...editData, level: e.target.value })} />
             <Input label="Size (m²)" value={editData.size_m2} onChange={(e) => setEditData({ ...editData, size_m2: e.target.value })} />
-            <Select label="Status" value={editData.status} options={[{ value: 'available', label: 'Available' }, { value: 'occupied', label: 'Occupied' }, { value: 'maintenance', label: 'Maintenance' }]} onChange={(e) => setEditData({ ...editData, status: e.target.value })} />
-            <Select label="Property" value={editData.property_id} options={properties.map(p => ({ value: p.id, label: p.name }))} onChange={(e) => setEditData({ ...editData, property_id: e.target.value })} />
+            <Select
+              label="Status"
+              value={editData.status}
+              options={[
+                { value: 'available', label: 'Available' },
+                { value: 'occupied', label: 'Occupied' },
+                { value: 'maintenance', label: 'Maintenance' },
+              ]}
+              onChange={(option) => setEditData({ ...editData, status: option.value })}
+            />
+
+            <Select
+              label="Property"
+              value={editData.property_id}
+              options={properties.map(p => ({ value: p.id, label: p.name }))}
+              onChange={(option) => setEditData({ ...editData, property_id: option.value })}
+            />
+
           </div>
         </Modal>
       )}

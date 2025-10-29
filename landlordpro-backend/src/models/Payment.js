@@ -9,45 +9,54 @@ const Payment = sequelize.define(
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
+      primaryKey: true,
     },
     amount: {
       type: DataTypes.DECIMAL(12, 2),
-      allowNull: false
+      allowNull: false,
     },
     date: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
+      defaultValue: DataTypes.NOW,
     },
     invoiceNumber: {
       type: DataTypes.STRING,
       unique: true,
       allowNull: false,
-      field: 'invoice_number'
+      field: 'invoice_number',
     },
     proofUrl: {
       type: DataTypes.STRING,
       allowNull: true,
-      field: 'proof_url'
+      field: 'proof_url',
     },
     leaseId: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: 'lease_id'
+      field: 'lease_id',
     },
     paymentModeId: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: 'payment_mode_id'
-    }
+      field: 'payment_mode_id',
+    },
+    startDate: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      field: 'start_date',
+      defaultValue: DataTypes.NOW, // optional default
+    },
+    endDate: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      field: 'end_date',
+    },
   },
   {
     tableName: 'payments',
     timestamps: true,
-    underscored: true
+    underscored: true,
   }
 );
-
-
 
 module.exports = Payment;

@@ -1,7 +1,7 @@
 // Sidebar.jsx
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Building, Users, FileText, DollarSign, Settings, BrickWall, CreditCard, StoreIcon } from 'lucide-react';
+import { Home, Building, Users, FileText, DollarSign, Settings, BrickWall, CreditCard, StoreIcon, Wallet } from 'lucide-react';
 
 const ICONS = {
   Dashboard: Home,
@@ -14,7 +14,7 @@ const ICONS = {
   PaymentMode:CreditCard,
   Invoices: FileText,
   Payments: DollarSign,
-  Expenses: DollarSign,
+  Expenses: Wallet,
   Documents: FileText,
   Reports: FileText,
   Settings: Settings,

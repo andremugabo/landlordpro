@@ -2,58 +2,40 @@ const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/paymentController');
 const { authenticate, adminOnly } = require('../middleware/authMiddleware');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { uploadProof, processProof } = require('../utils/fileUpload');
 
-// ✅ Secure all routes
+// Secure all routes
 router.use(authenticate);
 
-// ✅ Configure Multer for proof uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const paymentId = req.params.id || 'temp';
-    const uploadPath = path.join(__dirname, '../../uploads/payments', paymentId);
-
-    fs.mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}${ext}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const allowed = ['.png', '.jpg', '.jpeg', '.pdf'];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!allowed.includes(ext)) {
-      return cb(new Error('Only .png, .jpg, .jpeg, and .pdf files are allowed!'));
-    }
-    cb(null, true);
-  },
-});
-
-// ✅ Payment Routes
-// Example: /api/payments/payments
+// GET all payments
 router.get('/payments', paymentController.getAllPayments);
 
-// Example: /api/payments/payments/:id
+// GET single payment by ID
 router.get('/payments/:id', paymentController.getPaymentById);
 
-// Example: /api/payments/payments (with proof upload)
-router.post('/payments', upload.single('proof'), paymentController.createPayment);
+// POST create payment
+router.post(
+  '/payments',
+  uploadProof.single('proof'), // Multer memory storage
+  processProof,                // Sharp resize/compress for images
+  paymentController.createPayment
+);
 
-// Example: /api/payments/payments/:id
+// PUT update payment
+router.put(
+  '/payments/:id',
+  uploadProof.single('proof'),
+  processProof,
+  paymentController.updatePayment
+);
+
+// DELETE soft delete payment
 router.delete('/payments/:id', paymentController.deletePayment);
 
-// Example: /api/payments/payments/:id/restore
+// PATCH restore soft-deleted payment (admin only)
 router.patch('/payments/:id/restore', adminOnly, paymentController.restorePayment);
 
-// Example: /api/payments/proof/:paymentId/:filename
+// GET proof file
 router.get('/payments/proof/:paymentId/:filename', paymentController.getProofFile);
 
 module.exports = router;

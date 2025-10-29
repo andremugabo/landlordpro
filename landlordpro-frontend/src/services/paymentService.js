@@ -7,6 +7,7 @@ const axiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Attach token automatically
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -16,6 +17,7 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Response interceptor
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -24,47 +26,65 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-// Get all payments with optional search
+// Get all payments (optional search term)
 export const getAllPayments = async (term = '') => {
-  const params = {};
-  if (term) params.term = term;
+  const params = term ? { term } : {};
   const response = await axiosInstance.get('/', { params });
-  return response.data.payments;
+  return response.data?.data || [];
 };
 
-// Get single payment by ID
+// Get payment by ID
 export const getPaymentById = async (id) => {
   const response = await axiosInstance.get(`/${id}`);
-  return response.data.payment;
+  return response.data?.data || null;
 };
 
-// Create a new payment with optional proof file
+// Create a new payment (supports proof and date range)
 export const createPayment = async (data) => {
   const formData = new FormData();
   formData.append('amount', data.amount);
   formData.append('leaseId', data.leaseId);
   formData.append('paymentModeId', data.paymentModeId);
+  formData.append('startDate', data.startDate);
+  formData.append('endDate', data.endDate);
   if (data.proof) formData.append('proof', data.proof);
 
   const response = await axiosInstance.post('/', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
-  return response.data.payment;
+  return response.data?.data || null;
+};
+
+// Update payment (supports proof and date range)
+export const updatePayment = async (id, data) => {
+  const formData = new FormData();
+  if (data.amount) formData.append('amount', data.amount);
+  if (data.leaseId) formData.append('leaseId', data.leaseId);
+  if (data.paymentModeId) formData.append('paymentModeId', data.paymentModeId);
+  if (data.startDate) formData.append('startDate', data.startDate);
+  if (data.endDate) formData.append('endDate', data.endDate);
+  if (data.proof) formData.append('proof', data.proof);
+
+  const response = await axiosInstance.put(`/${id}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data?.data || null;
 };
 
 // Soft delete payment
 export const softDeletePayment = async (id) => {
   const response = await axiosInstance.delete(`/${id}`);
-  return response.data.message;
+  return response.data?.message || 'Deleted successfully';
 };
 
-// Restore soft-deleted payment (Admin only)
+// Restore soft-deleted payment
 export const restorePayment = async (id) => {
   const response = await axiosInstance.patch(`/${id}/restore`);
-  return response.data.payment;
+  return response.data?.data || null;
 };
 
-// Get proof file URL
+// Get payment proof URL
 export const getPaymentProofUrl = (paymentId, filename) => {
   return `${API_BASE_URL}/proof/${paymentId}/${filename}`;
 };
+

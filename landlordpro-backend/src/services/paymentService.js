@@ -5,45 +5,103 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { Op } = require('sequelize');
+const sharp = require('sharp');
 
 const UPLOAD_DIR = path.join(__dirname, '../../uploads/payments');
 
-// Helper to generate invoice numbers
+// Allowed types
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+const PDF_TYPES = ['application/pdf'];
+
+// Helper: generate invoice numbers
 const generateInvoiceNumber = () => {
   const timestamp = Date.now();
   return `INV-${timestamp}-${Math.floor(Math.random() * 1000)}`;
 };
 
+// Helper: process proof of payment (image or PDF)
+const processProofOfPayment = async (file, paymentId) => {
+  if (!file) return null;
+
+  const proofDir = path.join(UPLOAD_DIR, paymentId);
+  fs.mkdirSync(proofDir, { recursive: true });
+
+  const ext = path.extname(file.originalname).toLowerCase();
+  const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
+  const filepath = path.join(proofDir, filename);
+
+  // Image: resize & compress
+  if (IMAGE_TYPES.includes(file.mimetype)) {
+    const format = file.mimetype.split('/')[1];
+    let imageSharp = sharp(file.buffer).resize({ width: 800 });
+
+    if (format === 'jpeg' || format === 'jpg') await imageSharp.jpeg({ quality: 80 }).toFile(filepath);
+    else if (format === 'png') await imageSharp.png({ compressionLevel: 8 }).toFile(filepath);
+    else if (format === 'webp') await imageSharp.webp({ quality: 80 }).toFile(filepath);
+    else await imageSharp.toFile(filepath);
+  }
+  // PDF: save directly
+  else if (PDF_TYPES.includes(file.mimetype)) {
+    fs.writeFileSync(filepath, file.buffer);
+  } else {
+    throw new Error('Unsupported file type');
+  }
+
+  return `/uploads/payments/${paymentId}/${filename}`;
+};
+
+// -------------------- SERVICE FUNCTIONS --------------------
+
 // Create a new payment
 const createPayment = async (data, file) => {
-  const { amount, leaseId, paymentModeId } = data;
+  const { amount, leaseId, paymentModeId, startDate, endDate } = data;
 
-  if (!amount || !leaseId || !paymentModeId) {
-    throw new Error('Amount, leaseId, and paymentModeId are required');
+  if (!amount || !leaseId || !paymentModeId || !startDate || !endDate) {
+    throw new Error('Amount, leaseId, paymentModeId, startDate, and endDate are required');
   }
+  if (new Date(startDate) > new Date(endDate)) throw new Error('Start date cannot be after end date');
 
   const invoiceNumber = generateInvoiceNumber();
   const paymentId = uuidv4();
-  const proofDir = path.join(UPLOAD_DIR, paymentId);
 
-  if (!fs.existsSync(proofDir)) fs.mkdirSync(proofDir, { recursive: true });
-
-  let proofUrl = null;
-  if (file) {
-    const filePath = path.join(proofDir, file.originalname);
-    fs.renameSync(file.path, filePath);
-    proofUrl = `/uploads/payments/${paymentId}/${file.originalname}`;
-  }
+  const proofUrl = await processProofOfPayment(file, paymentId);
 
   const payment = await Payment.create({
     id: paymentId,
     amount,
     leaseId,
     paymentModeId,
+    startDate,
+    endDate,
     invoiceNumber,
     proofUrl,
   });
 
+  return payment;
+};
+
+// Update payment (replace proof if new file provided)
+const updatePayment = async (paymentId, updates, file) => {
+  const payment = await Payment.findByPk(paymentId);
+  if (!payment) throw new Error('Payment not found');
+
+  if (updates.startDate && updates.endDate) {
+    if (new Date(updates.startDate) > new Date(updates.endDate)) {
+      throw new Error('Start date cannot be after end date');
+    }
+  }
+
+  if (file) {
+    // Delete old proof if exists
+    if (payment.proofUrl) {
+      const oldPath = path.join(__dirname, '../../', payment.proofUrl);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+
+    updates.proofUrl = await processProofOfPayment(file, paymentId);
+  }
+
+  await payment.update(updates);
   return payment;
 };
 
@@ -108,6 +166,7 @@ const restorePayment = async (id) => {
 
 module.exports = {
   createPayment,
+  updatePayment,
   getAllPayments,
   getPaymentById,
   deletePayment,
