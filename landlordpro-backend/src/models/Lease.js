@@ -1,6 +1,6 @@
 const { DataTypes } = require('sequelize');
+const { v4: uuidv4 } = require('uuid'); 
 const sequelize = require('../../db');
-
 
 const Lease = sequelize.define(
   'Lease',
@@ -15,7 +15,7 @@ const Lease = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
-      defaultValue: () => `LEASE-${uuidv4().split('-')[0].toUpperCase()}`, // e.g., LEASE-9F23A1
+      defaultValue: () => `LEASE-${uuidv4().split('-')[0].toUpperCase()}`,
     },
     start_date: {
       type: DataTypes.DATE,
@@ -51,9 +51,8 @@ const Lease = sequelize.define(
     underscored: true,
     deletedAt: 'deleted_at',
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
   }
 );
-
 
 module.exports = Lease;

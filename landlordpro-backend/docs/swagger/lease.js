@@ -94,7 +94,7 @@
  * @swagger
  * /api/leases:
  *   get:
- *     summary: Get all leases (paginated)
+ *     summary: Get all leases (paginated, optionally filter by status)
  *     tags: [Leases]
  *     security:
  *       - bearerAuth: []
@@ -111,6 +111,12 @@
  *           type: integer
  *           example: 10
  *         description: Number of items per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, expired, cancelled]
+ *         description: Filter leases by status
  *     responses:
  *       200:
  *         description: List of leases retrieved successfully
@@ -232,7 +238,7 @@
  *         description: Lease not found
  *
  *   delete:
- *     summary: Delete a lease by ID
+ *     summary: Soft-delete a lease by ID
  *     tags: [Leases]
  *     security:
  *       - bearerAuth: []
@@ -245,7 +251,7 @@
  *           format: uuid
  *     responses:
  *       204:
- *         description: Lease deleted successfully (notification sent to tenant)
+ *         description: Lease deleted successfully
  *       404:
  *         description: Lease not found
  */
@@ -266,6 +272,34 @@
  *             schema:
  *               type: string
  *               format: binary
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /api/leases/trigger-expired:
+ *   post:
+ *     summary: Manually mark expired leases (admin only)
+ *     tags: [Leases]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Expired leases updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "3 lease(s) marked as expired."
+ *       403:
+ *         description: Forbidden (admin only)
  *       500:
  *         description: Internal server error
  */

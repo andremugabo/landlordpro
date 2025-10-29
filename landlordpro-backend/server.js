@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors'); 
 const path = require('path');
+require('./src/utils/leaseStatusUpdater');
 
 dotenv.config();
 

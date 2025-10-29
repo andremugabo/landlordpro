@@ -1,83 +1,138 @@
 // leaseService.js
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_BASE_URL + '/api' || '/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL
+  ? `${import.meta.env.VITE_API_BASE_URL}/api`
+  : '/api';
+
+const authHeaders = () => ({
+  Authorization: `Bearer ${localStorage.getItem('token')}`,
+});
 
 const leaseService = {
-  // ✅ Fetch all leases
-  getLeases: async (page = 1, limit = 10) => {
+  /**
+   * ✅ Fetch all leases (supports pagination and optional filtering by status)
+   */
+  getLeases: async (page = 1, limit = 10, status = '') => {
     try {
-      const res = await axios.get(`${API_URL}/leases?page=${page}&limit=${limit}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      const params = new URLSearchParams({ page, limit });
+      if (status) params.append('status', status);
+
+      const res = await axios.get(`${BASE_URL}/leases?${params.toString()}`, {
+        headers: authHeaders(),
       });
+
       return res.data;
     } catch (err) {
-      console.error('Failed to fetch leases:', err);
-      throw err;
+      console.error('❌ Failed to fetch leases:', err);
+      throw err.response?.data || err;
     }
   },
 
-  // ✅ Create a new lease (includes leaseAmount)
+  /**
+   * ✅ Get a single lease by ID
+   */
+  getLeaseById: async (id) => {
+    try {
+      const res = await axios.get(`${BASE_URL}/leases/${id}`, {
+        headers: authHeaders(),
+      });
+      return res.data;
+    } catch (err) {
+      console.error(`❌ Failed to fetch lease ${id}:`, err);
+      throw err.response?.data || err;
+    }
+  },
+
+  /**
+   * ✅ Create a new lease
+   */
   createLease: async (leaseData) => {
     try {
       const payload = {
         startDate: leaseData.startDate,
         endDate: leaseData.endDate,
+        leaseAmount: leaseData.leaseAmount,
         localId: leaseData.localId,
         tenantId: leaseData.tenantId,
-        leaseAmount: leaseData.leaseAmount, 
+        status: leaseData.status || 'active',
       };
 
-      const res = await axios.post(`${API_URL}/leases`, payload, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      const res = await axios.post(`${BASE_URL}/leases`, payload, {
+        headers: authHeaders(),
       });
+
       return res.data;
     } catch (err) {
-      console.error('Failed to create lease:', err);
-      throw err;
+      console.error('❌ Failed to create lease:', err);
+      throw err.response?.data || err;
     }
   },
 
-  // ✅ Update existing lease (includes leaseAmount)
+  /**
+   * ✅ Update an existing lease
+   */
   updateLease: async (id, leaseData) => {
     try {
       const payload = {
         startDate: leaseData.startDate,
         endDate: leaseData.endDate,
+        leaseAmount: leaseData.leaseAmount,
         localId: leaseData.localId,
         tenantId: leaseData.tenantId,
-        leaseAmount: leaseData.leaseAmount,
         status: leaseData.status,
       };
 
-      const res = await axios.put(`${API_URL}/leases/${id}`, payload, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      const res = await axios.put(`${BASE_URL}/leases/${id}`, payload, {
+        headers: authHeaders(),
       });
+
       return res.data;
     } catch (err) {
-      console.error(`Failed to update lease ${id}:`, err);
-      throw err;
+      console.error(`❌ Failed to update lease ${id}:`, err);
+      throw err.response?.data || err;
     }
   },
 
-  // ✅ Delete lease
+  /**
+   * ✅ Soft delete a lease
+   */
   deleteLease: async (id) => {
     try {
-      const res = await axios.delete(`${API_URL}/leases/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      const res = await axios.delete(`${BASE_URL}/leases/${id}`, {
+        headers: authHeaders(),
       });
+
       return res.data;
     } catch (err) {
-      console.error(`Failed to delete lease ${id}:`, err);
-      throw err;
+      console.error(`❌ Failed to delete lease ${id}:`, err);
+      throw err.response?.data || err;
     }
   },
 
-  // ✅ Download PDF report
+  /**
+   * ✅ Manually trigger expired leases (admin only)
+   */
+  triggerExpiredLeases: async () => {
+    try {
+      const res = await axios.post(`${BASE_URL}/leases/trigger-expired`, {}, {
+        headers: authHeaders(),
+      });
+
+      return res.data;
+    } catch (err) {
+      console.error('❌ Failed to trigger expired leases:', err);
+      throw err.response?.data || err;
+    }
+  },
+
+  /**
+   * ✅ Download lease PDF report
+   */
   downloadPdfReport: async () => {
     try {
-      const res = await axios.get(`${API_URL}/report/pdf`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      const res = await axios.get(`${BASE_URL}/report/pdf`, {
+        headers: authHeaders(),
         responseType: 'blob',
       });
 
@@ -94,8 +149,8 @@ const leaseService = {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Failed to download PDF report:', err);
-      throw err;
+      console.error('❌ Failed to download PDF report:', err);
+      throw err.response?.data || err;
     }
   },
 };

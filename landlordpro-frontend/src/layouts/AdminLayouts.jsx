@@ -15,7 +15,7 @@ const adminLinks = [
   { label: 'Tenants', path: '/admin/tenants' },
   { label: 'Leases', path: '/admin/leases' },
   { label: 'PaymentMode', path: '/admin/paymentMode' },
-  { label: 'Invoices', path: '/admin/invoices' },
+  // { label: 'Invoices', path: '/admin/invoices' },
   { label: 'Payments', path: '/admin/payments' },
   { label: 'Expenses', path: '/admin/expenses' },
   { label: 'Documents', path: '/admin/documents' },

@@ -1,4 +1,6 @@
+// src/services/paymentModeService.js
 import axios from 'axios';
+import { showSuccess, showError, showInfo } from '../utils/toastHelper';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL + '/api/payment-modes';
 
@@ -7,7 +9,7 @@ const axiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// 🔐 Include JWT token in every request
+//  Include JWT token in every request
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -17,70 +19,55 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ⚠️ Handle global 401 errors
+//  Global 401 handler
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) console.error('Unauthorized: please log in.');
+    if (error.response?.status === 401) showError('Unauthorized: please log in.');
     return Promise.reject(error.response?.data || error);
   }
 );
 
-/**
- * 📄 Get all payment modes with pagination
- * @param {number} page
- * @param {number} limit
- * @param {string} search
- */
+// Helper for standardized API call
+const handleRequest = async (apiCall, successMessage) => {
+  try {
+    const response = await apiCall();
+    if (successMessage) showSuccess(successMessage);
+    return response.data;
+  } catch (err) {
+    showError(err?.message || 'Something went wrong');
+    throw err;
+  }
+};
+
+//  Get all payment modes with pagination & optional search
 export const getAllPaymentModes = async (page = 1, limit = 10, search = '') => {
   const params = { page, limit };
   if (search) params.search = search;
-  const response = await axiosInstance.get('/', { params });
-  return response.data; // { paymentModes, totalPages, page }
+  return handleRequest(() => axiosInstance.get('/', { params }));
 };
 
-/**
- * 📋 Get a payment mode by ID
- * @param {string} id
- */
+//  Get a payment mode by ID
 export const getPaymentModeById = async (id) => {
-  const response = await axiosInstance.get(`/${id}`);
-  return response.data.paymentMode;
+  return handleRequest(() => axiosInstance.get(`/${id}`));
 };
 
-/**
- * ➕ Create a new payment mode
- * @param {object} data - { code, displayName, requiresProof, description }
- */
+//  Create a new payment mode
 export const createPaymentMode = async (data) => {
-  const response = await axiosInstance.post('/', data);
-  return response.data.paymentMode;
+  return handleRequest(() => axiosInstance.post('/', data), 'Payment mode created successfully!');
 };
 
-/**
- * ✏️ Update payment mode
- * @param {string} id
- * @param {object} data
- */
+//  Update payment mode
 export const updatePaymentMode = async (id, data) => {
-  const response = await axiosInstance.put(`/${id}`, data);
-  return response.data.paymentMode;
+  return handleRequest(() => axiosInstance.put(`/${id}`, data), 'Payment mode updated successfully!');
 };
 
-/**
- * 🗑️ Soft delete payment mode
- * @param {string} id
- */
+//  Delete payment mode
 export const deletePaymentMode = async (id) => {
-  const response = await axiosInstance.delete(`/${id}`);
-  return response.data.message;
+  return handleRequest(() => axiosInstance.delete(`/${id}`), 'Payment mode deleted successfully!');
 };
 
-/**
- * ♻️ Restore payment mode (Admin only)
- * @param {string} id
- */
+//  Restore payment mode (Admin only)
 export const restorePaymentMode = async (id) => {
-  const response = await axiosInstance.patch(`/${id}/restore`);
-  return response.data.paymentMode;
+  return handleRequest(() => axiosInstance.patch(`/${id}/restore`), 'Payment mode restored successfully!');
 };
