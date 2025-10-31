@@ -64,7 +64,7 @@ const PaymentPage = () => {
     try {
       setLoading(true);
       const res = await getAllPayments(term);
-      console.log('Payments response:', res);
+      // console.log('Payments response:', res);
       
       const paymentsArray = Array.isArray(res) ? res : res?.data || [];
       setPayments(paymentsArray);
@@ -548,23 +548,42 @@ const PaymentPage = () => {
               placeholder="Enter amount"
             />
 
+            {/* Lease Select */}
             <Select
               label="Lease"
-              options={leasesOptions}
-              value={leasesOptions.find(l => l.value === editData.leaseId) || null}
+              value={
+                editData.leaseId
+                  ? leasesOptions.find(opt => opt.value === editData.leaseId)
+                  : { value: '', label: '— Select Lease —', isDisabled: true }
+              }
+              options={[
+                { value: '', label: '— Select Lease —', isDisabled: true },
+                ...leasesOptions,
+              ]}
               onChange={(selected) => setEditData({ ...editData, leaseId: selected?.value || '' })}
+              isOptionDisabled={(option) => option.isDisabled}
               placeholder="Select Lease..."
               isSearchable
             />
 
+            {/* Payment Mode Select */}
             <Select
               label="Payment Mode"
-              options={paymentModesOptions}
-              value={paymentModesOptions.find(pm => pm.value === editData.paymentModeId) || null}
+              value={
+                editData.paymentModeId
+                  ? paymentModesOptions.find(opt => opt.value === editData.paymentModeId)
+                  : { value: '', label: '— Select Payment Mode —', isDisabled: true }
+              }
+              options={[
+                { value: '', label: '— Select Payment Mode —', isDisabled: true },
+                ...paymentModesOptions,
+              ]}
               onChange={(selected) => setEditData({ ...editData, paymentModeId: selected?.value || '' })}
+              isOptionDisabled={(option) => option.isDisabled}
               placeholder="Select Payment Mode..."
               isSearchable
             />
+
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input

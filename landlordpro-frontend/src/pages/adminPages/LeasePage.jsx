@@ -466,38 +466,73 @@ const LeasePage = () => {
         
             <Select
               label="Tenant"
-              value={tenantsOptions.find(t => t.value === editData.tenantId) || null}
-              onChange={selected => setEditData({ ...editData, tenantId: selected?.value || '' })}
-              options={tenantsOptions}
+              value={
+                editData.tenantId
+                  ? tenantsOptions.find(t => t.value === editData.tenantId)
+                  : { value: '', label: '— Select Tenant —', isDisabled: true }
+              }
+              options={[
+                { value: '', label: '— Select Tenant —', isDisabled: true },
+                ...tenantsOptions,
+              ]}
+              onChange={selected =>
+                setEditData({ ...editData, tenantId: selected?.value || '' })
+              }
+              isOptionDisabled={option => option.isDisabled}
               placeholder="Select Tenant..."
               isSearchable
             />
+
         
-            <Select
-              label="Property"
-              value={propertiesOptions.find(p => p.value === editData.propertyId) || null}
-              onChange={selected => {
-                const propertyId = selected?.value || '';
-                setEditData({ ...editData, propertyId, localId: '' });
-                const localsForProperty = locals.filter(l => 
-                  (l.property_id || l.propertyId) === propertyId
-                );
-                setFilteredLocals(localsForProperty);
-              }}
-              options={propertiesOptions}
-              placeholder="Select Property..."
-              isSearchable
-            />
+              <Select
+                label="Property"
+                value={
+                  editData.propertyId
+                    ? propertiesOptions.find(p => p.value === editData.propertyId)
+                    : { value: '', label: '— Select Property —', isDisabled: true }
+                }
+                options={[
+                  { value: '', label: '— Select Property —', isDisabled: true },
+                  ...propertiesOptions,
+                ]}
+                onChange={selected => {
+                  const propertyId = selected?.value || '';
+                  setEditData({ ...editData, propertyId, localId: '' });
+
+                  // Filter locals by selected property
+                  const localsForProperty = locals.filter(
+                    l => (l.property_id || l.propertyId) === propertyId
+                  );
+                  setFilteredLocals(localsForProperty);
+                }}
+                isOptionDisabled={option => option.isDisabled}
+                placeholder="Select Property..."
+                isSearchable
+              />
+
         
-            <Select
-              label="Local"
-              value={filteredLocals.map(l => ({ value: l.id, label: l.reference_code })).find(l => l.value === editData.localId) || null}
-              onChange={selected => setEditData({ ...editData, localId: selected?.value || '' })}
-              options={filteredLocals.map(l => ({ value: l.id, label: l.reference_code }))}
-              placeholder={editData.propertyId ? "Select Local..." : "Please select a property first"}
-              isSearchable
-              isDisabled={!editData.propertyId}
-            />
+              <Select
+                label="Local"
+                value={
+                  editData.localId
+                    ? filteredLocals
+                        .map(l => ({ value: l.id, label: l.reference_code }))
+                        .find(l => l.value === editData.localId)
+                    : { value: '', label: '— Select Local —', isDisabled: true }
+                }
+                options={[
+                  { value: '', label: '— Select Local —', isDisabled: true },
+                  ...filteredLocals.map(l => ({ value: l.id, label: l.reference_code })),
+                ]}
+                onChange={selected =>
+                  setEditData({ ...editData, localId: selected?.value || '' })
+                }
+                isOptionDisabled={option => option.isDisabled}
+                placeholder={editData.propertyId ? 'Select Local...' : 'Select a property first'}
+                isDisabled={!editData.propertyId}
+                isSearchable
+              />
+
         
             <Select
               label="Status"

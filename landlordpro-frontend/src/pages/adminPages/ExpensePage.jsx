@@ -30,7 +30,6 @@ const ExpensePage = () => {
   const fetchProperties = async () => {
     try {
       const data = await getAllProperties();
-    //   console.log(data.properties)
       setProperties(Array.isArray(data.properties) ? data.properties : []);
     } catch (err) {
       showError(err?.message || 'Failed to fetch properties');
@@ -42,7 +41,6 @@ const ExpensePage = () => {
   const fetchLocals = async (propertyId = '') => {
     try {
       const data = await getAllLocals(propertyId);
-    //   console.log(data.locals)
       setLocals(Array.isArray(data.locals) ? data.locals : []);
     } catch (err) {
       showError(err?.message || 'Failed to fetch locals');
@@ -60,7 +58,6 @@ const ExpensePage = () => {
         propertyId: filterProperty,
         localId: filterLocal,
       });
-    //   console.log(data)
       setExpenses(Array.isArray(data) ? data : []);
       setTotalPages(data?.totalPages || 1);
     } catch (err) {
@@ -125,6 +122,17 @@ const ExpensePage = () => {
       e.description?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Convert property/local options
+  const propertyOptions = [
+    { value: '', label: '— All Properties —', isDisabled: true },
+    ...properties.map(p => ({ value: p.id, label: p.name })),
+  ];
+
+  const localOptions = [
+    { value: '', label: '— All Locals —', isDisabled: true },
+    ...locals.map(l => ({ value: l.id, label: l.reference_code })),
+  ];
+
   return (
     <div className="space-y-6 pt-12 px-3 sm:px-6">
       {/* Header */}
@@ -143,60 +151,65 @@ const ExpensePage = () => {
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3 sm:space-y-0 sm:flex sm:flex-wrap sm:items-end sm:justify-between gap-3">
-  {/* Search Input */}
-  <div className="flex-1 min-w-[200px]">
-    <label className="text-sm font-medium text-gray-600 block mb-1">Search</label>
-    <Input
-      placeholder="Search by category or description..."
-      value={searchTerm}
-      onChange={(e) => setSearchTerm(e.target.value)}
-      className="w-full border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 transition"
-    />
-  </div>
+        {/* Search Input */}
+        <div className="flex-1 min-w-[200px]">
+          <label className="text-sm font-medium text-gray-600 block mb-1">Search</label>
+          <Input
+            placeholder="Search by category or description..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 transition"
+          />
+        </div>
 
-  {/* Property Select */}
-  <div className="flex-1 min-w-[180px]">
-    <label className="text-sm font-medium text-gray-600 block mb-1">Property</label>
-    <Select
-      options={[
-        { value: '', label: 'All Properties' },
-        ...(Array.isArray(properties) ? properties.map(p => ({ value: p.id, label: p.name })) : [])
-      ]}
-      value={filterProperty}
-      onChange={(e) => setFilterProperty(e.target.value)}
-      className="w-full"
-    />
-  </div>
+        {/* Property Select */}
+        <div className="flex-1 min-w-[180px]">
+          <label className="text-sm font-medium text-gray-600 block mb-1">Property</label>
+          <Select
+            value={
+              filterProperty
+                ? propertyOptions.find(opt => opt.value === filterProperty)
+                : { value: '', label: '— All Properties —', isDisabled: true }
+            }
+            options={propertyOptions}
+            onChange={(selected) => setFilterProperty(selected?.value || '')}
+            isOptionDisabled={(option) => option.isDisabled}
+            placeholder="Select Property..."
+            isSearchable
+          />
+        </div>
 
-  {/* Local Select */}
-  <div className="flex-1 min-w-[180px]">
-    <label className="text-sm font-medium text-gray-600 block mb-1">Local</label>
-    <Select
-      options={[
-        { value: '', label: 'All Locals' },
-        ...(Array.isArray(locals) ? locals.map(l => ({ value: l.id, label: l.reference_code })) : [])
-      ]}
-      value={filterLocal}
-      onChange={(e) => setFilterLocal(e.target.value)}
-      className="w-full"
-    />
-  </div>
+        {/* Local Select */}
+        <div className="flex-1 min-w-[180px]">
+          <label className="text-sm font-medium text-gray-600 block mb-1">Local</label>
+          <Select
+            value={
+              filterLocal
+                ? localOptions.find(opt => opt.value === filterLocal)
+                : { value: '', label: '— All Locals —', isDisabled: true }
+            }
+            options={localOptions}
+            onChange={(selected) => setFilterLocal(selected?.value || '')}
+            isOptionDisabled={(option) => option.isDisabled}
+            placeholder="Select Local..."
+            isSearchable
+          />
+        </div>
 
-  {/* Reset Button */}
-  <div className="flex items-center justify-end sm:justify-start w-full sm:w-auto">
-    <Button
-      onClick={() => {
-        setSearchTerm('');
-        setFilterProperty('');
-        setFilterLocal('');
-      }}
-      className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition"
-    >
-      Reset Filters
-    </Button>
-  </div>
-</div>
-
+        {/* Reset Button */}
+        <div className="flex items-center justify-end sm:justify-start w-full sm:w-auto">
+          <Button
+            onClick={() => {
+              setSearchTerm('');
+              setFilterProperty('');
+              setFilterLocal('');
+            }}
+            className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition"
+          >
+            Reset Filters
+          </Button>
+        </div>
+      </div>
 
       {/* Expenses List */}
       <div className="grid gap-4">

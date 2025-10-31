@@ -1,7 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input, Select, Button } from './index';
 
 const ExpenseForm = ({ editData, setEditData, properties, locals, onSubmit, submitLoading }) => {
+  const [filteredLocals, setFilteredLocals] = useState([]);
+
+  // Prepare property options
+  const propertiesOptions = properties.map(p => ({ value: p.id, label: p.name }));
+
+  // Update filtered locals when editData.propertyId changes (for editing existing expense)
+  useEffect(() => {
+    if (editData.propertyId) {
+      const localsForProperty = locals.filter(
+        l => (l.property_id || l.propertyId) === editData.propertyId
+      );
+      setFilteredLocals(localsForProperty);
+    } else {
+      setFilteredLocals([]);
+    }
+  }, [editData.propertyId, locals]);
+
   return (
     <div className="space-y-4">
       <Input
@@ -26,18 +43,57 @@ const ExpenseForm = ({ editData, setEditData, properties, locals, onSubmit, subm
         value={editData.date ? new Date(editData.date).toISOString().split('T')[0] : ''}
         onChange={(e) => setEditData({ ...editData, date: e.target.value })}
       />
+
+      {/* Property Select */}
       <Select
         label="Property"
-        options={properties.map(p => ({ value: p.id, label: p.name }))}
-        value={editData.propertyId || ''}
-        onChange={(e) => setEditData({ ...editData, propertyId: e.target.value })}
+        value={
+          editData.propertyId
+            ? propertiesOptions.find(p => p.value === editData.propertyId)
+            : { value: '', label: '— Select Property —', isDisabled: true }
+        }
+        options={[
+          { value: '', label: '— Select Property —', isDisabled: true },
+          ...propertiesOptions,
+        ]}
+        onChange={selected => {
+          const propertyId = selected?.value || '';
+          setEditData({ ...editData, propertyId, localId: '' });
+
+          // Filter locals by selected property
+          const localsForProperty = locals.filter(
+            l => (l.property_id || l.propertyId) === propertyId
+          );
+          setFilteredLocals(localsForProperty);
+        }}
+        isOptionDisabled={option => option.isDisabled}
+        placeholder="Select Property..."
+        isSearchable
       />
+
+      {/* Local Select */}
       <Select
         label="Local"
-        options={locals.map(l => ({ value: l.id, label: l.reference_code }))}
-        value={editData.localId || ''}
-        onChange={(e) => setEditData({ ...editData, localId: e.target.value })}
+        value={
+          editData.localId
+            ? filteredLocals
+                .map(l => ({ value: l.id, label: l.reference_code }))
+                .find(l => l.value === editData.localId)
+            : { value: '', label: '— Select Local —', isDisabled: true }
+        }
+        options={[
+          { value: '', label: '— Select Local —', isDisabled: true },
+          ...filteredLocals.map(l => ({ value: l.id, label: l.reference_code })),
+        ]}
+        onChange={selected =>
+          setEditData({ ...editData, localId: selected?.value || '' })
+        }
+        isOptionDisabled={option => option.isDisabled}
+        placeholder={editData.propertyId ? 'Select Local...' : 'Select a property first'}
+        isDisabled={!editData.propertyId}
+        isSearchable
       />
+
       <Button
         onClick={onSubmit}
         disabled={submitLoading}
