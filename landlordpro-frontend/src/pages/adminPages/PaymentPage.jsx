@@ -5,6 +5,7 @@ import {
   updatePayment,
   softDeletePayment,
   restorePayment,
+  getPaymentProofUrl,
 } from '../../services/paymentService';
 import { getAllPaymentModes } from '../../services/paymentModeService';
 import leaseService from '../../services/leaseService';
@@ -34,6 +35,29 @@ const PaymentPage = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const PAGE_SIZE = 10;
+
+  // ✅ Helper to get full proof URL
+  const getFullProofUrl = (payment) => {
+    if (!payment.proofUrl) return null;
+    
+    // If it's already a full URL, return as is
+    if (payment.proofUrl.startsWith('http')) {
+      return payment.proofUrl;
+    }
+    
+    // If it's a relative path starting with /uploads
+    if (payment.proofUrl.startsWith('/uploads')) {
+      return `${import.meta.env.VITE_API_BASE_URL}${payment.proofUrl}`;
+    }
+    
+    // If it's just a filename, construct the full URL
+    if (payment.proofFilename) {
+      return getPaymentProofUrl(payment.id, payment.proofFilename);
+    }
+    
+    // Fallback - try to construct from proofUrl
+    return `${import.meta.env.VITE_API_BASE_URL}${payment.proofUrl}`;
+  };
 
   // ✅ Fetch all payments with pagination
   const fetchPayments = async (pageNumber = 1, term = '') => {
@@ -149,8 +173,11 @@ const PaymentPage = () => {
       endDate: payment.endDate?.split('T')[0] || '',
       proof: null,
     });
-    if (payment.proofUrl) {
-      setProofPreview(payment.proofUrl);
+    
+    // Show existing proof as preview
+    const fullProofUrl = getFullProofUrl(payment);
+    if (fullProofUrl) {
+      setProofPreview(fullProofUrl);
     }
     setModalOpen(true);
   };
@@ -189,11 +216,13 @@ const PaymentPage = () => {
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         showError('File size must be less than 5MB');
+        e.target.value = ''; // Reset input
         return;
       }
       // Validate file type
       if (!file.type.startsWith('image/')) {
         showError('Only image files are allowed');
+        e.target.value = ''; // Reset input
         return;
       }
       setEditData({ ...editData, proof: file });
@@ -307,6 +336,7 @@ const PaymentPage = () => {
                       const leaseName = lease?.reference || `Lease ${p.leaseId}`;
                       const modeName =
                         paymentModes.find((m) => m.id === p.paymentModeId)?.displayName || 'N/A';
+                      const fullProofUrl = getFullProofUrl(p);
 
                       return (
                         <tr key={p.id} className="hover:bg-blue-50 transition">
@@ -327,16 +357,25 @@ const PaymentPage = () => {
                             </div>
                           </td>
                           <td className="p-3">
-                            {p.proofUrl ? (
+                            {fullProofUrl ? (
                               <img
-                                src={p.proofUrl}
+                                src={fullProofUrl}
                                 alt="proof"
                                 className="h-12 w-12 object-cover rounded-md shadow cursor-pointer border border-gray-200 hover:scale-110 transition"
-                                onClick={() => handleViewProof(p.proofUrl)}
+                                onClick={() => handleViewProof(fullProofUrl)}
+                                onError={(e) => {
+                                  console.error('Image load error:', fullProofUrl);
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'inline';
+                                }}
                               />
-                            ) : (
-                              <span className="text-gray-400 text-xs">No proof</span>
-                            )}
+                            ) : null}
+                            <span 
+                              className="text-gray-400 text-xs" 
+                              style={{ display: fullProofUrl ? 'none' : 'inline' }}
+                            >
+                              No proof
+                            </span>
                           </td>
                           <td className="p-3 flex justify-center gap-2">
                             {!p.deleted_at ? (
@@ -378,6 +417,7 @@ const PaymentPage = () => {
                 const leaseName = lease?.reference || `Lease ${p.leaseId}`;
                 const modeName =
                   paymentModes.find((m) => m.id === p.paymentModeId)?.displayName || 'N/A';
+                const fullProofUrl = getFullProofUrl(p);
 
                 return (
                   <Card
@@ -407,13 +447,17 @@ const PaymentPage = () => {
                           {formatDateRange(p.startDate, p.endDate)}
                         </span>
                       </div>
-                      {p.proofUrl && (
+                      {fullProofUrl && (
                         <div className="mt-2">
                           <img
-                            src={p.proofUrl}
+                            src={fullProofUrl}
                             alt="proof"
                             className="max-h-40 w-full object-contain rounded-md shadow cursor-pointer border border-gray-200"
-                            onClick={() => handleViewProof(p.proofUrl)}
+                            onClick={() => handleViewProof(fullProofUrl)}
+                            onError={(e) => {
+                              console.error('Image load error:', fullProofUrl);
+                              e.target.style.display = 'none';
+                            }}
                           />
                         </div>
                       )}
@@ -539,7 +583,7 @@ const PaymentPage = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Payment Proof (Optional)
+                Payment Proof {selectedPayment && '(Upload new to replace)'}
               </label>
               <Input 
                 type="file" 
@@ -551,11 +595,17 @@ const PaymentPage = () => {
 
             {proofPreview && (
               <div className="mt-2">
-                <p className="text-sm text-gray-600 mb-1">Preview:</p>
+                <p className="text-sm text-gray-600 mb-1">
+                  {selectedPayment ? 'Current/New Proof:' : 'Preview:'}
+                </p>
                 <img
                   src={proofPreview}
                   alt="preview"
                   className="max-h-40 rounded-md shadow border border-gray-200"
+                  onError={(e) => {
+                    console.error('Preview load error:', proofPreview);
+                    e.target.style.display = 'none';
+                  }}
                 />
               </div>
             )}
@@ -575,6 +625,10 @@ const PaymentPage = () => {
               src={proofUrl}
               alt="Payment Proof"
               className="max-h-[500px] mx-auto rounded-md shadow-md"
+              onError={(e) => {
+                console.error('Full image load error:', proofUrl);
+                e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">Image not available</text></svg>';
+              }}
             />
             <div className="mt-3 text-sm text-gray-500 break-all">{proofUrl.split('/').pop()}</div>
           </div>
