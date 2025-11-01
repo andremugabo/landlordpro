@@ -15,6 +15,8 @@ export { default as PaymentModePage } from './adminPages/PaymentModePage'
 export { default as PaymentPage } from './adminPages/PaymentPage'
 export { default as ExpensePage } from './adminPages/ExpensePage'
 export { default as FloorPage } from './adminPages/FloorPage'
+export { default as Documents } from './adminPages/Documents'
+export { default as Reports } from './adminPages/Reports'
 
 // Manager pages
 export { default as ManagerDashboard } from './managerPages/ManagerDashboard'

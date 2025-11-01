@@ -2,27 +2,17 @@ const express = require('express');
 const router = express.Router();
 const floorController = require('../controllers/floorController');
 
+// ------------------- Occupancy Reports (static first!) -------------------
+router.get('/floors/reports/occupancy', floorController.getAllFloorsOccupancy);
+router.get('/floors/:id/occupancy', floorController.getFloorOccupancy);
+
 // ------------------- CRUD -------------------
-// Create a new floor (optional)
-// router.post('/', floorController.createFloor);
-
-// Get all floors
-router.get('/floors', floorController.getAllFloors);
-
-// Get a floor by ID
-router.get('/floors/:id', floorController.getFloorById);
-
-// Update a floor
+router.get('/floors', floorController.getAllFloors);       // list all floors
+router.get('/floors/:id', floorController.getFloorById);  // single floor
 router.put('/floors/:id', floorController.updateFloor);
-
-// Soft-delete a floor
 router.delete('/floors/:id', floorController.deleteFloor);
 
-// ------------------- Occupancy -------------------
-// Occupancy report for all floors
-router.get('/floors/reports/occupancy', floorController.getAllFloorsOccupancy);
-
-// Occupancy report for a single floor
-router.get('/floors/:id/occupancy', floorController.getFloorOccupancy);
+// Optional: create
+// router.post('/floors', floorController.createFloor);
 
 module.exports = router;

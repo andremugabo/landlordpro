@@ -7,7 +7,8 @@ const sharp = require('sharp');
 // -------------------- CONFIG --------------------
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-const UPLOAD_DIR = path.join(__dirname, '../../uploads/payments');
+const UPLOAD_DIR = path.join(__dirname, `../../uploads/${process.env.UPLOAD_FOLDER || 'payments'}`);
+
 
 // -------------------- MULTER MEMORY STORAGE --------------------
 const storage = multer.memoryStorage();
