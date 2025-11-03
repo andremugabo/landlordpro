@@ -1,50 +1,50 @@
 const { Op } = require('sequelize');
-const Tenant = require('../models/Tenant'); 
+const Tenant = require('../models/Tenant');
 
-// 🧾 Get all tenants (with pagination + optional search)
-async function getAllTenants(page = 1, limit = 10, search = '') {
+// 🧾 Get all tenants (pagination + optional search)
+async function getAllTenants({ page = 1, limit = 10, search = '' }) {
   const offset = (page - 1) * limit;
 
-  const where = {
-    deletedAt: null,
-    ...(search && {
-      [Op.or]: [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { company_name: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
-        { phone: { [Op.iLike]: `%${search}%` } },
-        { tin_number: { [Op.iLike]: `%${search}%` } },
-      ],
-    }),
-  };
+  const where = {};
+  
+  if (search) {
+    where[Op.or] = [
+      { name: { [Op.iLike]: `%${search}%` } },
+      { company_name: { [Op.iLike]: `%${search}%` } },
+      { email: { [Op.iLike]: `%${search}%` } },
+      { phone: { [Op.iLike]: `%${search}%` } },
+      { tin_number: { [Op.iLike]: `%${search}%` } },
+    ];
+  }
 
   const { rows: tenants, count } = await Tenant.findAndCountAll({
     where,
     limit,
     offset,
-    order: [['name', 'DESC']],
+    order: [['name', 'ASC']],
+    paranoid: true, // ensures deleted tenants are excluded
   });
 
   return {
     tenants,
+    total: count,
     totalPages: Math.ceil(count / limit),
     page,
+    limit,
   };
 }
 
 // 🔍 Get single tenant
 async function getTenantById(id) {
-  const tenant = await Tenant.findOne({ where: { id, deletedAt: null } });
+  const tenant = await Tenant.findByPk(id, { paranoid: true });
   if (!tenant) throw new Error('Tenant not found');
   return tenant;
 }
 
 // ➕ Create tenant (individual or company)
 async function createTenant(data) {
-  // Validate required fields
   if (!data.name) throw new Error('Representative name is required');
 
-  // If company_name or tin_number is provided, treat as company
   return await Tenant.create({
     name: data.name,
     company_name: data.company_name || null,
@@ -56,8 +56,8 @@ async function createTenant(data) {
 
 // ✏️ Update tenant
 async function updateTenant(id, data) {
-  const tenant = await Tenant.findOne({ where: { id, deletedAt: null } });
-  if (!tenant) throw new Error('Tenant not found');
+  const tenant = await Tenant.findByPk(id, { paranoid: false });
+  if (!tenant || tenant.deletedAt) throw new Error('Tenant not found');
 
   const fieldsToUpdate = {
     name: data.name ?? tenant.name,
@@ -73,17 +73,19 @@ async function updateTenant(id, data) {
 
 // 🗑️ Soft delete tenant
 async function deleteTenant(id) {
-  const tenant = await Tenant.findOne({ where: { id, deletedAt: null } });
+  const tenant = await Tenant.findByPk(id, { paranoid: true });
   if (!tenant) throw new Error('Tenant not found');
-  await tenant.update({ deletedAt: new Date() });
+
+  await tenant.destroy(); // uses Sequelize paranoid soft delete
   return { message: 'Tenant soft deleted successfully' };
 }
 
 // ♻️ Restore tenant (admin)
 async function restoreTenant(id) {
-  const tenant = await Tenant.findOne({ where: { id, deletedAt: { [Op.ne]: null } } });
-  if (!tenant) throw new Error('Tenant not found or already active');
-  await tenant.update({ deletedAt: null });
+  const tenant = await Tenant.findByPk(id, { paranoid: false });
+  if (!tenant || !tenant.deletedAt) throw new Error('Tenant not found or already active');
+
+  await tenant.restore();
   return tenant;
 }
 

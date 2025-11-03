@@ -1,27 +1,32 @@
 const tenantService = require('../services/tenantService');
 
-// 📄 Get all tenants
+// 📄 Get all tenants (with pagination + optional search)
 async function getAllTenants(req, res) {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
-    const result = await tenantService.getAllTenants(+page, +limit, search);
-    res.json({ success: true, ...result });
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const search = req.query.search || '';
+
+    const result = await tenantService.getAllTenants({ page, limit, search });
+    res.status(200).json({ success: true, ...result });
   } catch (err) {
+    console.error('Error fetching tenants:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 }
 
-// 🔍 Get single tenant
+// 🔍 Get single tenant by ID
 async function getTenantById(req, res) {
   try {
     const tenant = await tenantService.getTenantById(req.params.id);
-    res.json({ success: true, tenant });
+    res.status(200).json({ success: true, tenant });
   } catch (err) {
+    console.error('Error fetching tenant:', err);
     res.status(404).json({ success: false, message: err.message });
   }
 }
 
-// ➕ Create tenant (individual or company)
+// ➕ Create tenant
 async function createTenant(req, res) {
   try {
     const { name, email, phone, company_name, tin_number } = req.body;
@@ -36,6 +41,7 @@ async function createTenant(req, res) {
 
     res.status(201).json({ success: true, message: 'Tenant created successfully', tenant });
   } catch (err) {
+    console.error('Error creating tenant:', err);
     res.status(400).json({ success: false, message: err.message });
   }
 }
@@ -53,8 +59,9 @@ async function updateTenant(req, res) {
       tin_number,
     });
 
-    res.json({ success: true, message: 'Tenant updated successfully', tenant });
+    res.status(200).json({ success: true, message: 'Tenant updated successfully', tenant });
   } catch (err) {
+    console.error('Error updating tenant:', err);
     res.status(400).json({ success: false, message: err.message });
   }
 }
@@ -63,8 +70,9 @@ async function updateTenant(req, res) {
 async function deleteTenant(req, res) {
   try {
     const result = await tenantService.deleteTenant(req.params.id);
-    res.json({ success: true, message: result.message });
+    res.status(200).json({ success: true, message: result.message });
   } catch (err) {
+    console.error('Error deleting tenant:', err);
     res.status(404).json({ success: false, message: err.message });
   }
 }
@@ -73,8 +81,9 @@ async function deleteTenant(req, res) {
 async function restoreTenant(req, res) {
   try {
     const tenant = await tenantService.restoreTenant(req.params.id);
-    res.json({ success: true, message: 'Tenant restored successfully', tenant });
+    res.status(200).json({ success: true, message: 'Tenant restored successfully', tenant });
   } catch (err) {
+    console.error('Error restoring tenant:', err);
     res.status(404).json({ success: false, message: err.message });
   }
 }

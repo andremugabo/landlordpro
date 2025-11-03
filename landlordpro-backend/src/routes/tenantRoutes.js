@@ -23,30 +23,30 @@ router.get('/tenants/:id', tenantController.getTenantById);
 /**
  * @route POST /tenants
  * @desc Create a new tenant
- * @access Admin only (optional, currently all authenticated users)
+ * @access Admin only
  */
-router.post('/tenants', tenantController.createTenant);
+router.post('/tenants', adminOnly, tenantController.createTenant);
 
 /**
  * @route PUT /tenants/:id
  * @desc Fully update a tenant
- * @access Authenticated users (consider admin only)
+ * @access Admin only
  */
-router.put('/tenants/:id', tenantController.updateTenant);
+router.put('/tenants/:id', adminOnly, tenantController.updateTenant);
 
 /**
  * @route PATCH /tenants/:id
  * @desc Partially update a tenant
- * @access Authenticated users (consider admin only)
+ * @access Admin only
  */
-router.patch('/tenants/:id', tenantController.updateTenant);
+router.patch('/tenants/:id', adminOnly, tenantController.updateTenant);
 
 /**
  * @route DELETE /tenants/:id
  * @desc Soft delete a tenant
- * @access Admin only (optional, consider restricting)
+ * @access Admin only
  */
-router.delete('/tenants/:id', tenantController.deleteTenant);
+router.delete('/tenants/:id', adminOnly, tenantController.deleteTenant);
 
 /**
  * @route PATCH /tenants/:id/restore

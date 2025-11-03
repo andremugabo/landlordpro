@@ -2,7 +2,7 @@
  * @swagger
  * tags:
  *   name: Tenants
- *   description: Tenant management endpoints
+ *   description: Tenant management endpoints (individuals and companies)
  */
 
 /**
@@ -22,7 +22,7 @@
  *           example: "John Doe"
  *         company_name:
  *           type: string
- *           description: Name of the company
+ *           description: Name of the company, if applicable
  *           example: "Acme Corp"
  *         tin_number:
  *           type: string
@@ -45,7 +45,7 @@
  * @swagger
  * /api/tenants:
  *   get:
- *     summary: Get all tenants (paginated)
+ *     summary: Get all tenants (paginated, searchable)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -66,7 +66,7 @@
  *         name: search
  *         schema:
  *           type: string
- *         description: Search by name, company_name, email, or phone
+ *         description: Search by name, company_name, email, phone, or TIN
  *     responses:
  *       200:
  *         description: List of tenants retrieved successfully
@@ -127,54 +127,8 @@
  *         description: Tenant not found
  *       401:
  *         description: Unauthorized
- */
-
-/**
- * @swagger
- * /api/tenants:
- *   post:
- *     summary: Create a new tenant
- *     tags: [Tenants]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *             properties:
- *               name:
- *                 type: string
- *                 example: "John Doe"
- *               company_name:
- *                 type: string
- *                 example: "Acme Corp"
- *               tin_number:
- *                 type: string
- *                 example: "123456789"
- *               email:
- *                 type: string
- *                 example: "john@example.com"
- *               phone:
- *                 type: string
- *                 example: "+250788123456"
- *     responses:
- *       201:
- *         description: Tenant created successfully
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- */
-
-/**
- * @swagger
- * /api/tenants/{id}:
  *   put:
- *     summary: Update tenant information
+ *     summary: Update a tenant completely (Admin only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -212,15 +166,12 @@
  *         description: Tenant updated successfully
  *       400:
  *         description: Invalid input
- *       401:
- *         description: Unauthorized
- */
-
-/**
- * @swagger
- * /api/tenants/{id}:
+ *       403:
+ *         description: Forbidden (Admin only)
+ *       404:
+ *         description: Tenant not found
  *   delete:
- *     summary: Soft delete a tenant (mark as deleted)
+ *     summary: Soft delete a tenant (Admin only)
  *     tags: [Tenants]
  *     security:
  *       - bearerAuth: []
@@ -236,8 +187,8 @@
  *         description: Tenant soft deleted successfully
  *       404:
  *         description: Tenant not found
- *       401:
- *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (Admin only)
  */
 
 /**
