@@ -4,8 +4,10 @@ const paymentController = require('../controllers/paymentController');
 const { authenticate, adminOnly } = require('../middleware/authMiddleware');
 const { uploadProof, processProof } = require('../utils/fileUpload');
 
-// Secure all routes
+// 🔹 Secure all routes
 router.use(authenticate);
+
+// -------------------- PAYMENT ROUTES --------------------
 
 // GET all payments
 router.get('/payments', paymentController.getAllPayments);
@@ -37,5 +39,10 @@ router.patch('/payments/:id/restore', adminOnly, paymentController.restorePaymen
 
 // GET proof file
 router.get('/payments/proof/:paymentId/:filename', paymentController.getProofFile);
+
+// -------------------- NOTIFICATION ROUTE --------------------
+
+// Trigger notifications for upcoming payments (admin only)
+router.post('/payments/notify-upcoming', adminOnly, paymentController.triggerPaymentNotifications);
 
 module.exports = router;

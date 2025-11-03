@@ -20,10 +20,14 @@
  *           type: number
  *           format: double
  *           example: 250.50
- *         date:
+ *         startDate:
  *           type: string
  *           format: date-time
- *           example: "2025-10-06T12:19:51.681Z"
+ *           example: "2025-10-01T00:00:00.000Z"
+ *         endDate:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-10-31T23:59:59.999Z"
  *         invoiceNumber:
  *           type: string
  *           example: "INV-20251006-001"
@@ -39,10 +43,10 @@
  *           type: string
  *           format: uuid
  *           example: "907e68e4-2a10-4aab-813f-97a034592fc4"
- *         created_at:
+ *         createdAt:
  *           type: string
  *           format: date-time
- *         updated_at:
+ *         updatedAt:
  *           type: string
  *           format: date-time
  */
@@ -60,7 +64,7 @@
  *         name: term
  *         schema:
  *           type: string
- *         description: Search term (by invoice number, lease ID, etc.)
+ *         description: Search term (by invoice number, lease reference, etc.)
  *     responses:
  *       200:
  *         description: List of payments
@@ -72,7 +76,7 @@
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 payments:
+ *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Payment'
@@ -105,21 +109,10 @@
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 payment:
+ *                 data:
  *                   $ref: '#/components/schemas/Payment'
  *       404:
  *         description: Payment not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Payment not found
  */
 
 /**
@@ -140,6 +133,8 @@
  *               - amount
  *               - leaseId
  *               - paymentModeId
+ *               - startDate
+ *               - endDate
  *             properties:
  *               amount:
  *                 type: number
@@ -148,11 +143,15 @@
  *               leaseId:
  *                 type: string
  *                 format: uuid
- *                 example: "c56a4180-65aa-42ec-a945-5fd21dec0538"
  *               paymentModeId:
  *                 type: string
  *                 format: uuid
- *                 example: "907e68e4-2a10-4aab-813f-97a034592fc4"
+ *               startDate:
+ *                 type: string
+ *                 format: date-time
+ *               endDate:
+ *                 type: string
+ *                 format: date-time
  *               proof:
  *                 type: string
  *                 format: binary
@@ -167,11 +166,55 @@
  *               properties:
  *                 success:
  *                   type: boolean
- *                   example: true
- *                 payment:
+ *                 data:
  *                   $ref: '#/components/schemas/Payment'
  *       400:
  *         description: Validation error
+ */
+
+/**
+ * @swagger
+ * /api/payments/{id}:
+ *   put:
+ *     summary: Update a payment (full update)
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 format: double
+ *               leaseId:
+ *                 type: string
+ *                 format: uuid
+ *               paymentModeId:
+ *                 type: string
+ *                 format: uuid
+ *               startDate:
+ *                 type: string
+ *                 format: date-time
+ *               endDate:
+ *                 type: string
+ *                 format: date-time
+ *               proof:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Payment updated successfully
  */
 
 /**
@@ -189,23 +232,9 @@
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Payment ID
  *     responses:
  *       200:
  *         description: Payment soft deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Payment deleted successfully
- *       400:
- *         description: Validation error
  */
 
 /**
@@ -223,24 +252,9 @@
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Payment ID to restore
  *     responses:
  *       200:
  *         description: Payment restored successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 payment:
- *                   $ref: '#/components/schemas/Payment'
- *       403:
- *         description: Forbidden (only admins)
- *       404:
- *         description: Payment not found
  */
 
 /**
@@ -258,13 +272,11 @@
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Payment ID
  *       - in: path
  *         name: filename
  *         required: true
  *         schema:
  *           type: string
- *         description: Proof file name
  *     responses:
  *       200:
  *         description: File returned successfully
@@ -273,6 +285,30 @@
  *             schema:
  *               type: string
  *               format: binary
- *       404:
- *         description: Proof file not found
+ */
+
+/**
+ * @swagger
+ * /api/payments/notify-upcoming:
+ *   post:
+ *     summary: Trigger notifications for leases with payments expiring in one month (Admins only)
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Notifications triggered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Notifications triggered successfully
+ *       403:
+ *         description: Forbidden (Admin only)
  */

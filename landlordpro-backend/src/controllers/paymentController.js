@@ -23,7 +23,7 @@ const createPayment = async (req, res) => {
     });
   } catch (err) {
     console.error('Error creating payment:', err);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: err.message || 'Internal server error' });
   }
 };
 
@@ -37,7 +37,6 @@ const updatePayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Start date cannot be after end date' });
     }
 
-    // Let service handle file replacement safely
     const updatedPayment = await paymentService.updatePayment(paymentId, body, file);
 
     res.status(200).json({
@@ -47,7 +46,7 @@ const updatePayment = async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating payment:', err);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: err.message || 'Internal server error' });
   }
 };
 
@@ -59,7 +58,7 @@ const getAllPayments = async (req, res) => {
     res.json({ success: true, data: payments });
   } catch (err) {
     console.error('Error fetching payments:', err);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: err.message || 'Internal server error' });
   }
 };
 
@@ -70,7 +69,7 @@ const getPaymentById = async (req, res) => {
     res.json({ success: true, data: payment });
   } catch (err) {
     console.error('Error fetching payment by ID:', err);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: err.message || 'Internal server error' });
   }
 };
 
@@ -81,7 +80,7 @@ const deletePayment = async (req, res) => {
     res.json({ success: true, message: 'Payment deleted successfully' });
   } catch (err) {
     console.error('Error deleting payment:', err);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: err.message || 'Internal server error' });
   }
 };
 
@@ -92,7 +91,7 @@ const restorePayment = async (req, res) => {
     res.json({ success: true, message: 'Payment restored successfully', data: payment });
   } catch (err) {
     console.error('Error restoring payment:', err);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: err.message || 'Internal server error' });
   }
 };
 
@@ -103,12 +102,25 @@ const getProofFile = async (req, res) => {
     const safeFilename = path.basename(filename);
     const proofPath = path.join(__dirname, '../../uploads/payments', paymentId, safeFilename);
 
-    if (!fs.existsSync(proofPath)) return res.status(404).json({ success: false, message: 'Proof file not found' });
+    if (!fs.existsSync(proofPath)) {
+      return res.status(404).json({ success: false, message: 'Proof file not found' });
+    }
 
     res.sendFile(proofPath);
   } catch (err) {
     console.error('Error serving proof file:', err);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: err.message || 'Internal server error' });
+  }
+};
+
+// -------------------- TRIGGER PAYMENT NOTIFICATIONS --------------------
+const triggerPaymentNotifications = async (req, res) => {
+  try {
+    await paymentService.notifyUpcomingPayments();
+    res.json({ success: true, message: 'Payment notifications triggered successfully' });
+  } catch (err) {
+    console.error('Error triggering notifications:', err);
+    res.status(500).json({ success: false, message: err.message || 'Internal server error' });
   }
 };
 
@@ -120,4 +132,5 @@ module.exports = {
   deletePayment,
   restorePayment,
   getProofFile,
+  triggerPaymentNotifications, 
 };
