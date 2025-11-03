@@ -1,69 +1,102 @@
 const floorService = require('../services/floorService');
-const { Property } = require('../models')
 
 /**
- * Helper to handle async controller actions
+ * Helper for unified async error handling
  */
 const handleAsync = (fn) => (req, res) =>
   fn(req, res).catch((err) => {
-    console.error(err); // optional logging
-    res.status(err.status || 500).json({ error: err.message });
+    console.error(err);
+    res.status(err.status || 500).json({
+      success: false,
+      message: err.message || 'An unexpected error occurred.',
+    });
   });
 
-// ------------------- CRUD -------------------
-
-// Create a new floor
+// ================================
+// 🚫 Create Floor (Disabled)
+// ================================
 exports.createFloor = handleAsync(async (req, res) => {
-  // Currently not implemented
-  res.status(501).json({ message: 'Floor creation is not implemented' });
+  return res.status(405).json({
+    success: false,
+    message: 'Floors are automatically created with properties. Manual creation is not allowed.',
+  });
 });
 
-// Get all floors with property name
+// ================================
+// 📋 Get All Floors with Property Info
+// ================================
 exports.getAllFloors = handleAsync(async (req, res) => {
-    const floors = await floorService.getAllFloors();
-  
-    // Map results to include property name
-    const formattedFloors = floors.map(floor => ({
-      id: floor.id,
-      name: floor.name,
-      level_number: floor.level_number,
-      property_id: floor.property_id,
-      property_name: floor.propertyForFloor?.name || null, // use correct alias
-      localsForFloor: floor.localsForFloor || [],
-    }));
-  
-    res.status(200).json(formattedFloors);
-  });
-  
+  const floors = await floorService.getAllFloors();
 
-// Get a floor by ID
+  const formattedFloors = floors.map((floor) => ({
+    id: floor.id,
+    name: floor.name,
+    level_number: floor.level_number,
+    property_id: floor.property_id,
+    property_name: floor.propertyForFloor?.name || null,
+    locals: floor.localsForFloor || [],
+  }));
+
+  res.status(200).json({
+    success: true,
+    total: formattedFloors.length,
+    data: formattedFloors,
+  });
+});
+
+// ================================
+// 🔍 Get a Floor by ID
+// ================================
 exports.getFloorById = handleAsync(async (req, res) => {
   const floor = await floorService.getFloorById(req.params.id);
-  res.status(200).json(floor);
+  res.status(200).json({
+    success: true,
+    data: floor,
+  });
 });
 
-// Update a floor
+// ================================
+// ✏️ Update Floor Info
+// ================================
 exports.updateFloor = handleAsync(async (req, res) => {
-  const floor = await floorService.updateFloor(req.params.id, req.body);
-  res.status(200).json(floor);
+  const updated = await floorService.updateFloor(req.params.id, req.body);
+  res.status(200).json({
+    success: true,
+    message: 'Floor updated successfully.',
+    data: updated,
+  });
 });
 
-// Delete a floor (soft delete)
+// ================================
+// 🗑️ Delete (Soft Delete) Floor
+// ================================
 exports.deleteFloor = handleAsync(async (req, res) => {
   const result = await floorService.deleteFloor(req.params.id);
-  res.status(200).json(result);
+  res.status(200).json({
+    success: true,
+    ...result,
+  });
 });
 
-// ------------------- Occupancy Reports -------------------
+// ================================
+// 📊 Occupancy Reports
+// ================================
 
-// Get occupancy report for one floor
+// Single floor occupancy
 exports.getFloorOccupancy = handleAsync(async (req, res) => {
   const report = await floorService.getFloorOccupancy(req.params.id);
-  res.status(200).json(report);
+  res.status(200).json({
+    success: true,
+    data: report,
+  });
 });
 
-// Get occupancy report for all floors
+// All floors occupancy
 exports.getAllFloorsOccupancy = handleAsync(async (req, res) => {
   const report = await floorService.getAllFloorsOccupancy();
-  res.status(200).json(report);
+  res.status(200).json({
+    success: true,
+    total: report.length,
+    data: report,
+  });
 });

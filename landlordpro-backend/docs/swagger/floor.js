@@ -2,20 +2,20 @@
  * @swagger
  * tags:
  *   name: Floors
- *   description: Floor management (admin only for create/update/delete)
+ *   description: Floor management (admin only for update/delete; floors auto-created with properties)
  */
 
 /**
  * @swagger
  * /api/floors:
  *   get:
- *     summary: Get all floors with their locals
+ *     summary: Get all floors with their locals and property names
  *     tags: [Floors]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: List of all floors with their locals
+ *         description: List of all floors with their locals and property
  *         content:
  *           application/json:
  *             schema:
@@ -35,6 +35,9 @@
  *                   property_id:
  *                     type: string
  *                     example: "c1a2b3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6"
+ *                   property_name:
+ *                     type: string
+ *                     example: "Sunset Apartments"
  *                   localsForFloor:
  *                     type: array
  *                     items:
@@ -142,7 +145,7 @@
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Occupancy report for all floors
+ *         description: Occupancy report for all floors (managers see only their property floors)
  *         content:
  *           application/json:
  *             schema:

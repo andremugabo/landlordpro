@@ -2,14 +2,14 @@
  * @swagger
  * tags:
  *   name: Properties
- *   description: Property management (admin only for create/update/delete)
+ *   description: Property management (admin only for create/update/delete; managers can view their assigned properties)
  */
 
 /**
  * @swagger
  * /api/properties:
  *   post:
- *     summary: Create a new property
+ *     summary: Create a new property (admin only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
@@ -40,22 +40,42 @@
  *               has_basement:
  *                 type: boolean
  *                 example: true
+ *               manager_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Optional manager assignment
  *     responses:
  *       201:
  *         description: Property created successfully with floors
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Property created successfully with floors."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     property:
+ *                       $ref: '#/components/schemas/Property'
+ *                     floors:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Floor'
  *       400:
  *         description: Bad request (validation error)
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Forbidden (admin only)
- */
-
-/**
- * @swagger
- * /api/properties:
+ *
  *   get:
- *     summary: Get all properties (with pagination)
+ *     summary: Get all properties (with pagination; managers see assigned properties only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
@@ -74,45 +94,34 @@
  *         description: Number of properties per page
  *     responses:
  *       200:
- *         description: List of properties with pagination info
+ *         description: Paginated list of properties
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 total:
- *                   type: integer
- *                   example: 50
- *                 page:
- *                   type: integer
- *                   example: 1
- *                 limit:
- *                   type: integer
- *                   example: 10
- *                 totalPages:
- *                   type: integer
- *                   example: 5
- *                 properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       example: 50
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 10
+ *                     totalPages:
+ *                       type: integer
+ *                       example: 5
+ *                 data:
  *                   type: array
  *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                         example: "c1a2b3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6"
- *                       name:
- *                         type: string
- *                         example: "Sunset Apartments"
- *                       location:
- *                         type: string
- *                         example: "123 Main St, Kigali"
- *                       description:
- *                         type: string
- *                         example: "A spacious 2-bedroom apartment"
- *                       created_at:
- *                         type: string
- *                         format: date-time
- *                         example: "2025-10-02T14:00:00.000Z"
+ *                     $ref: '#/components/schemas/Property'
  *       401:
  *         description: Unauthorized
  */
@@ -121,7 +130,7 @@
  * @swagger
  * /api/properties/{id}:
  *   get:
- *     summary: Get a property by ID with floors
+ *     summary: Get property by ID (admin or assigned manager)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
@@ -131,18 +140,28 @@
  *         required: true
  *         schema:
  *           type: string
- *           example: "c1a2b3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6"
+ *           format: uuid
  *         description: Property ID
  *     responses:
  *       200:
  *         description: Property details including floors
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/Property'
  *       404:
- *         description: Property not found
+ *         description: Property not found or access denied
  *       401:
  *         description: Unauthorized
- * 
+ *
  *   put:
- *     summary: Update a property (admin only)
+ *     summary: Update property (admin only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
@@ -152,6 +171,7 @@
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *     requestBody:
  *       required: true
  *       content:
@@ -178,9 +198,9 @@
  *         description: Unauthorized
  *       403:
  *         description: Forbidden (admin only)
- * 
+ *
  *   delete:
- *     summary: Soft-delete a property (admin only)
+ *     summary: Soft-delete property (admin only)
  *     tags: [Properties]
  *     security:
  *       - bearerAuth: []
@@ -190,11 +210,12 @@
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *     responses:
  *       200:
  *         description: Property soft-deleted successfully
  *       404:
- *         description: Property not found
+ *         description: Property not found or access denied
  *       401:
  *         description: Unauthorized
  *       403:
@@ -215,12 +236,25 @@
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *         description: Property ID
  *     responses:
  *       200:
  *         description: List of floors for the property
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Floor'
  *       404:
- *         description: Property not found
+ *         description: Property not found or access denied
  *       401:
  *         description: Unauthorized
  */
@@ -239,12 +273,61 @@
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *         description: Property ID
  *     responses:
  *       200:
  *         description: List of locals for the property
  *       404:
- *         description: Property not found
+ *         description: Property not found or access denied
  *       401:
  *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Property:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         name:
+ *           type: string
+ *         location:
+ *           type: string
+ *         description:
+ *           type: string
+ *         number_of_floors:
+ *           type: integer
+ *         has_basement:
+ *           type: boolean
+ *         manager_id:
+ *           type: string
+ *           format: uuid
+ *         floorsForProperty:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Floor'
+ *     Floor:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         property_id:
+ *           type: string
+ *           format: uuid
+ *         level_number:
+ *           type: integer
+ *         name:
+ *           type: string
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *         updated_at:
+ *           type: string
+ *           format: date-time
  */

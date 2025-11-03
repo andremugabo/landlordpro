@@ -53,4 +53,14 @@ function adminOnly(req, res, next) {
   next();
 }
 
-module.exports = { authenticate, adminOnly };
+/**
+ * Middleware: Restrict route to admin or manager users
+ */
+function managerOrAdminOnly(req, res, next) {
+  if (req.user?.role === 'admin' || req.user?.role === 'manager') {
+    return next();
+  }
+  return res.status(403).json({ success: false, message: 'Access denied: Managers or admins only' });
+}
+
+module.exports = { authenticate, adminOnly, managerOrAdminOnly };

@@ -1,26 +1,38 @@
 const { v4: uuidv4 } = require('uuid');
 const Joi = require('joi');
-const { Property, Floor } = require('../models'); 
+const { Op } = require('sequelize');
+const { Property, Floor } = require('../models');
 
-// ✅ Validation schema
+// ================================
+// ✅ Validation Schema
+// ================================
 const propertySchema = Joi.object({
   name: Joi.string().required(),
   location: Joi.string().required(),
-  description: Joi.string().optional(),
+  description: Joi.string().allow('').optional(),
   number_of_floors: Joi.number().integer().min(1).required(),
-  has_basement: Joi.boolean().required()
+  has_basement: Joi.boolean().required(),
+  manager_id: Joi.string().uuid().optional() // for linking to manager
 });
 
-// ✅ Create a property (with floors)
-async function createProperty(data) {
-  // Validate input
+// ================================
+// ✅ Create Property (with Floors)
+// ================================
+async function createProperty(data, user) {
   const { error, value } = propertySchema.validate(data);
-  if (error) throw new Error(error.details[0].message);
+  if (error) {
+    const err = new Error(error.details[0].message);
+    err.status = 400;
+    throw err;
+  }
 
-  // Assign UUID
+  // If manager is creating the property, automatically assign them as manager
+  if (user.role === 'manager') {
+    value.manager_id = user.id;
+  }
+
   value.id = uuidv4();
 
-  // Create property
   const property = await Property.create(value);
 
   // Automatically create floors
@@ -35,7 +47,6 @@ async function createProperty(data) {
     });
   }
 
-  // Floors: 0 = Ground, 1 = First, etc.
   for (let i = 0; i <= value.number_of_floors; i++) {
     floors.push({
       id: uuidv4(),
@@ -50,89 +61,110 @@ async function createProperty(data) {
   return {
     success: true,
     message: 'Property created successfully with floors.',
-    property,
-    floors
+    data: { property, floors }
   };
 }
 
-// ✅ Get all properties
-async function getAllProperties(page = 1, limit = 10) {
-  page = parseInt(page);
-  limit = parseInt(limit);
+// ================================
+// ✅ Get All Properties (with Pagination)
+// ================================
+async function getAllProperties(user, page = 1, limit = 10) {
   const offset = (page - 1) * limit;
 
-  const total = await Property.count({ where: { deleted_at: null } });
+  const whereClause = { deleted_at: null };
+  if (user.role === 'manager') {
+    whereClause.manager_id = user.id; // Restrict to manager’s properties
+  }
 
-  const properties = await Property.findAll({
-    where: { deleted_at: null },
-    limit,
-    offset,
-    order: [['created_at', 'DESC']],
-    include: [{ model: Floor, as: 'floorsForProperty' }]
-  });
+  const [total, properties] = await Promise.all([
+    Property.count({ where: whereClause }),
+    Property.findAll({
+      where: whereClause,
+      limit: parseInt(limit),
+      offset,
+      order: [['created_at', 'DESC']],
+      include: [{ model: Floor, as: 'floorsForProperty' }]
+    })
+  ]);
 
   return {
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
-    properties
+    success: true,
+    pagination: {
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit)
+    },
+    data: properties
   };
 }
 
-// ✅ Get property by ID
-async function getPropertyById(id) {
-  const property = await Property.findOne({
-    where: { id, deleted_at: null },
-    include: [{ model: Floor, as: 'floorsForProperty' }]
-  });
-
-  if (!property) {
-    const error = new Error('Property not found');
-    error.status = 404;
-    throw error;
+// ================================
+// ✅ Get Property by ID (Restricted Access)
+// ================================
+async function getPropertyById(id, user) {
+  const whereClause = { id, deleted_at: null };
+  if (user.role === 'manager') {
+    whereClause.manager_id = user.id; // Restrict access
   }
 
-  return property;
-}
-
-// ✅ Update property
-// ✅ Update property and sync floors
-async function updateProperty(id, data) {
-  const { error, value } = propertySchema.validate(data, { presence: 'optional', abortEarly: false });
-  if (error) throw new Error(error.details[0].message);
-
-  // Find property
   const property = await Property.findOne({
-    where: { id, deleted_at: null },
+    where: whereClause,
     include: [{ model: Floor, as: 'floorsForProperty' }]
   });
 
   if (!property) {
-    const err = new Error('Property not found');
+    const err = new Error('Property not found or access denied.');
     err.status = 404;
     throw err;
   }
 
-  // Save old values before update
+  return { success: true, data: property };
+}
+
+// ================================
+// ✅ Update Property + Sync Floors
+// ================================
+async function updateProperty(id, data, user) {
+  const { error, value } = propertySchema.validate(data, {
+    presence: 'optional',
+    abortEarly: false
+  });
+  if (error) {
+    const err = new Error(error.details.map(e => e.message).join(', '));
+    err.status = 400;
+    throw err;
+  }
+
+  // Restrict managers to their own properties
+  const whereClause = { id, deleted_at: null };
+  if (user.role === 'manager') whereClause.manager_id = user.id;
+
+  const property = await Property.findOne({
+    where: whereClause,
+    include: [{ model: Floor, as: 'floorsForProperty' }]
+  });
+
+  if (!property) {
+    const err = new Error('Property not found or access denied.');
+    err.status = 404;
+    throw err;
+  }
+
   const oldNumFloors = property.number_of_floors;
   const oldHasBasement = property.has_basement;
 
-  // Update property
   await property.update(value);
 
-  // Fetch updated property values
   const newNumFloors = property.number_of_floors;
   const newHasBasement = property.has_basement;
 
   // ===============================
   // 🧱 FLOOR SYNCHRONIZATION LOGIC
   // ===============================
-  const { Op } = require('sequelize');
 
-  // ✅ Handle basement addition/removal
+  // Basement addition/removal
   if (newHasBasement && !oldHasBasement) {
-    // Add basement
     await Floor.create({
       id: uuidv4(),
       property_id: property.id,
@@ -140,15 +172,11 @@ async function updateProperty(id, data) {
       name: 'Basement'
     });
   } else if (!newHasBasement && oldHasBasement) {
-    // Remove basement
-    await Floor.destroy({
-      where: { property_id: property.id, level_number: -1 }
-    });
+    await Floor.destroy({ where: { property_id: property.id, level_number: -1 } });
   }
 
-  // ✅ Handle change in number of floors above ground
+  // Floors above ground
   if (newNumFloors > oldNumFloors) {
-    // Add new floors
     for (let i = oldNumFloors + 1; i <= newNumFloors; i++) {
       await Floor.create({
         id: uuidv4(),
@@ -158,16 +186,11 @@ async function updateProperty(id, data) {
       });
     }
   } else if (newNumFloors < oldNumFloors) {
-    // Remove extra floors
     await Floor.destroy({
-      where: {
-        property_id: property.id,
-        level_number: { [Op.gt]: newNumFloors }
-      }
+      where: { property_id: property.id, level_number: { [Op.gt]: newNumFloors } }
     });
   }
 
-  // ✅ Return updated property
   const updated = await Property.findOne({
     where: { id },
     include: [{ model: Floor, as: 'floorsForProperty' }]
@@ -176,22 +199,29 @@ async function updateProperty(id, data) {
   return {
     success: true,
     message: 'Property and floors updated successfully.',
-    property: updated
+    data: updated
   };
 }
 
+// ================================
+// ✅ Soft Delete Property
+// ================================
+async function deleteProperty(id, user) {
+  const whereClause = { id, deleted_at: null };
+  if (user.role === 'manager') whereClause.manager_id = user.id;
 
-// ✅ Soft delete property
-async function deleteProperty(id) {
-  const property = await Property.findOne({ where: { id, deleted_at: null } });
+  const property = await Property.findOne({ where: whereClause });
   if (!property) {
-    const error = new Error('Property not found');
-    error.status = 404;
-    throw error;
+    const err = new Error('Property not found or access denied.');
+    err.status = 404;
+    throw err;
   }
 
   await property.update({ deleted_at: new Date() });
-  return { message: 'Property deleted successfully (soft delete)' };
+  return {
+    success: true,
+    message: 'Property deleted successfully (soft delete).'
+  };
 }
 
 module.exports = {

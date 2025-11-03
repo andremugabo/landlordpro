@@ -60,6 +60,11 @@ Expense.belongsTo(Local, { foreignKey: 'local_id', as: 'localForExpense' });
 Property.hasMany(Expense, { foreignKey: 'property_id', as: 'expensesForProperty' });
 Expense.belongsTo(Property, { foreignKey: 'property_id', as: 'propertyForExpense' });
 
+// 🧑‍💼 User (Manager) ↔ Property
+User.hasMany(Property, { foreignKey: 'manager_id', as: 'managedProperties' });
+Property.belongsTo(User, { foreignKey: 'manager_id', as: 'manager' });
+
+
 module.exports = {
   User,
   Notification,

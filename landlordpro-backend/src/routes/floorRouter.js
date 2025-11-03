@@ -2,17 +2,58 @@ const express = require('express');
 const router = express.Router();
 const floorController = require('../controllers/floorController');
 
-// ------------------- Occupancy Reports (static first!) -------------------
-router.get('/floors/reports/occupancy', floorController.getAllFloorsOccupancy);
-router.get('/floors/:id/occupancy', floorController.getFloorOccupancy);
+// Middleware
+const { authenticate, adminOnly, managerOrAdminOnly } = require('../middleware/authMiddleware');
+const verifyManagerAccess = require('../middleware/verifyManagerAccess'); // can verify floor's property
 
-// ------------------- CRUD -------------------
-router.get('/floors', floorController.getAllFloors);       // list all floors
-router.get('/floors/:id', floorController.getFloorById);  // single floor
-router.put('/floors/:id', floorController.updateFloor);
-router.delete('/floors/:id', floorController.deleteFloor);
+// ======================================
+// 🔐 All routes protected
+// ======================================
+router.use(authenticate);
 
-// Optional: create
-// router.post('/floors', floorController.createFloor);
+// ================================
+// 📊 Occupancy Reports
+// ================================
+router.get(
+  '/floors/reports/occupancy',
+  managerOrAdminOnly,
+  floorController.getAllFloorsOccupancy
+);
+router.get(
+  '/floors/:id/occupancy',
+  managerOrAdminOnly,
+  verifyManagerAccess({ model: require('../models').Floor }),
+  floorController.getFloorOccupancy
+);
+
+// ================================
+// 📋 CRUD (Read/Update/Delete)
+// ================================
+router.get(
+  '/floors',
+  managerOrAdminOnly,
+  floorController.getAllFloors
+);
+
+router.get(
+  '/floors/:id',
+  managerOrAdminOnly,
+  verifyManagerAccess({ model: require('../models').Floor }),
+  floorController.getFloorById
+);
+
+router.put(
+  '/floors/:id',
+  adminOnly, // only admins can update floor details
+  floorController.updateFloor
+);
+
+router.delete(
+  '/floors/:id',
+  adminOnly, 
+  floorController.deleteFloor
+);
+
+
 
 module.exports = router;

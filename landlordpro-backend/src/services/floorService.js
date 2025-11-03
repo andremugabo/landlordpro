@@ -1,7 +1,9 @@
 const { Floor, Local, Property } = require('../models');
 
 class FloorService {
-  // Get all floors
+  /**
+   * Get all floors (with property + locals)
+   */
   async getAllFloors() {
     return Floor.findAll({
       include: [
@@ -20,41 +22,77 @@ class FloorService {
     });
   }
 
-  // Get a floor by ID
+  /**
+   * Get a floor by ID
+   */
   async getFloorById(id) {
     const floor = await Floor.findByPk(id, {
-      include: {
-        model: Local,
-        as: 'localsForFloor',
-        attributes: ['id', 'status'],
-      },
+      include: [
+        {
+          model: Local,
+          as: 'localsForFloor',
+          attributes: ['id', 'status'],
+        },
+        {
+          model: Property,
+          as: 'propertyForFloor',
+          attributes: ['id', 'name'],
+        },
+      ],
     });
-    if (!floor) throw new Error('Floor not found');
+
+    if (!floor) {
+      const error = new Error('Floor not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
     return floor;
   }
 
-  // Update floor
+  /**
+   * Update floor details
+   */
   async updateFloor(id, data) {
     const floor = await Floor.findByPk(id);
-    if (!floor) throw new Error('Floor not found');
+    if (!floor) {
+      const error = new Error('Floor not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
     await floor.update(data);
     return floor;
   }
 
-  // Soft delete floor
+  /**
+   * Soft delete floor
+   */
   async deleteFloor(id) {
     const floor = await Floor.findByPk(id);
-    if (!floor) throw new Error('Floor not found');
+    if (!floor) {
+      const error = new Error('Floor not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
     await floor.destroy();
     return { message: 'Floor deleted successfully' };
   }
 
-  // Occupancy report for one floor
+  /**
+   * Occupancy report for one floor
+   */
   async getFloorOccupancy(id) {
     const floor = await Floor.findByPk(id, {
       include: { model: Local, as: 'localsForFloor', attributes: ['status'] },
     });
-    if (!floor) throw new Error('Floor not found');
+
+    if (!floor) {
+      const error = new Error('Floor not found');
+      error.statusCode = 404;
+      throw error;
+    }
 
     const locals = floor.localsForFloor || [];
     const total = locals.length;
@@ -74,7 +112,9 @@ class FloorService {
     };
   }
 
-  // Occupancy report for all floors
+  /**
+   * Occupancy report for all floors
+   */
   async getAllFloorsOccupancy() {
     const floors = await Floor.findAll({
       include: { model: Local, as: 'localsForFloor', attributes: ['status'] },
@@ -102,5 +142,4 @@ class FloorService {
   }
 }
 
-// Export singleton instance
 module.exports = new FloorService();
