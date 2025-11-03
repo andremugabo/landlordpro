@@ -1,5 +1,4 @@
 const { DataTypes } = require('sequelize');
-const { v4: uuidv4 } = require('uuid'); 
 const sequelize = require('../../db');
 
 const Lease = sequelize.define(
@@ -15,7 +14,6 @@ const Lease = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
-      defaultValue: () => `LEASE-${uuidv4().split('-')[0].toUpperCase()}`,
     },
     start_date: {
       type: DataTypes.DATE,

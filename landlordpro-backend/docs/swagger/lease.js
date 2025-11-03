@@ -16,6 +16,10 @@
  *           type: string
  *           format: uuid
  *           example: d290f1ee-6c54-4b01-90e6-d701748f0851
+ *         reference:
+ *           type: string
+ *           example: "LEASE-JOHN-DOE"
+ *           description: Auto-generated lease reference (LEASE-NAME-OF-THE-TENANT)
  *         startDate:
  *           type: string
  *           format: date-time
@@ -41,6 +45,10 @@
  *           type: string
  *           format: uuid
  *           example: c56a4180-65aa-42ec-a945-5fd21dec0538
+ *         tenant:
+ *           $ref: '#/components/schemas/Tenant'
+ *         local:
+ *           $ref: '#/components/schemas/Local'
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -51,11 +59,7 @@
  *           type: string
  *           format: date-time
  *           nullable: true
- *         tenant:
- *           $ref: '#/components/schemas/Tenant'
- *         local:
- *           $ref: '#/components/schemas/Local'
- *
+ * 
  *     LeaseInput:
  *       type: object
  *       required:
@@ -94,7 +98,7 @@
  * @swagger
  * /api/leases:
  *   get:
- *     summary: Get all leases (paginated, optionally filter by status)
+ *     summary: Get all leases (paginated, optionally filtered by status)
  *     tags: [Leases]
  *     security:
  *       - bearerAuth: []
@@ -138,9 +142,11 @@
  *                   type: integer
  *                 totalPages:
  *                   type: integer
+ *       403:
+ *         description: Forbidden (manager trying to access unauthorized leases)
  *       500:
  *         description: Internal server error
- *
+ * 
  *   post:
  *     summary: Create a new lease
  *     tags: [Leases]
@@ -154,7 +160,7 @@
  *             $ref: '#/components/schemas/LeaseInput'
  *     responses:
  *       201:
- *         description: Lease created successfully (notification sent to tenant)
+ *         description: Lease created successfully (reference auto-generated)
  *         content:
  *           application/json:
  *             schema:
@@ -198,6 +204,8 @@
  *                   example: true
  *                 lease:
  *                   $ref: '#/components/schemas/Lease'
+ *       403:
+ *         description: Forbidden (manager trying to access unauthorized lease)
  *       404:
  *         description: Lease not found
  *
@@ -221,7 +229,7 @@
  *             $ref: '#/components/schemas/LeaseInput'
  *     responses:
  *       200:
- *         description: Lease updated successfully (notification sent to tenant)
+ *         description: Lease updated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -234,6 +242,8 @@
  *                   $ref: '#/components/schemas/Lease'
  *       400:
  *         description: Validation error
+ *       403:
+ *         description: Forbidden (manager trying to update unauthorized lease)
  *       404:
  *         description: Lease not found
  *
@@ -250,8 +260,10 @@
  *           type: string
  *           format: uuid
  *     responses:
- *       204:
- *         description: Lease deleted successfully
+ *       200:
+ *         description: Lease soft-deleted successfully
+ *       403:
+ *         description: Forbidden (manager trying to delete unauthorized lease)
  *       404:
  *         description: Lease not found
  */

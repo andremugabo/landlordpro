@@ -1,9 +1,9 @@
 const { Op } = require('sequelize');
+const { v4: uuidv4 } = require('uuid');
 const Lease = require('../models/Lease');
 const Local = require('../models/Local');
 const Tenant = require('../models/Tenant');
 
-/** Helper: Format lease for frontend (camelCase) */
 function formatLease(lease) {
   return {
     id: lease.id,
@@ -28,23 +28,13 @@ function formatLease(lease) {
   };
 }
 
-/** Create a new lease */
-async function createLease(data) {
-  const { startDate, endDate, leaseAmount, localId, tenantId, status } = data;
-
-  if (!startDate || !endDate || !leaseAmount || !localId || !tenantId) {
-    throw new Error('Missing required fields: startDate, endDate, leaseAmount, localId, tenantId');
-  }
-
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  if (start >= end) throw new Error('startDate must be before endDate');
-
-  // Check for overlapping active leases
+/** Helper: Check overlapping active leases */
+async function checkOverlap(localId, start, end, excludeLeaseId = null) {
   const overlapping = await Lease.findOne({
     where: {
       local_id: localId,
       status: 'active',
+      id: excludeLeaseId ? { [Op.ne]: excludeLeaseId } : undefined,
       [Op.or]: [
         { start_date: { [Op.between]: [start, end] } },
         { end_date: { [Op.between]: [start, end] } },
@@ -53,6 +43,27 @@ async function createLease(data) {
     }
   });
   if (overlapping) throw new Error('Lease overlaps with an existing active lease for this local');
+}
+
+/** Create a new lease */
+async function createLease({ startDate, endDate, leaseAmount, localId, tenantId, status = 'active' }) {
+  if (!startDate || !endDate || !leaseAmount || !localId || !tenantId) {
+    throw new Error('Missing required fields: startDate, endDate, leaseAmount, localId, tenantId');
+  }
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (start >= end) throw new Error('startDate must be before endDate');
+
+  await checkOverlap(localId, start, end);
+
+  // Fetch tenant to get name for reference
+  const tenant = await Tenant.findByPk(tenantId);
+  if (!tenant) throw new Error('Tenant not found');
+
+  const tenantNameClean = tenant.name.replace(/\s+/g, '-').toUpperCase();
+  const shortId = uuidv4().split('-')[0].toUpperCase();
+  const reference = `LEASE-${tenantNameClean}-${shortId}`;
 
   const lease = await Lease.create({
     start_date: start,
@@ -60,7 +71,8 @@ async function createLease(data) {
     lease_amount: Number(leaseAmount),
     local_id: localId,
     tenant_id: tenantId,
-    status: status || 'active'
+    status,
+    reference,
   });
 
   await lease.reload({
@@ -89,21 +101,9 @@ async function updateLease(id, data) {
 
   const localId = data.localId || lease.local_id;
 
-  // Check overlapping if dates/local change
+  // Check overlapping if dates/local changed
   if (localId !== lease.local_id || start.getTime() !== lease.start_date.getTime() || end.getTime() !== lease.end_date.getTime()) {
-    const overlapping = await Lease.findOne({
-      where: {
-        local_id: localId,
-        status: 'active',
-        id: { [Op.ne]: lease.id },
-        [Op.or]: [
-          { start_date: { [Op.between]: [start, end] } },
-          { end_date: { [Op.between]: [start, end] } },
-          { start_date: { [Op.lte]: start }, end_date: { [Op.gte]: end } }
-        ]
-      }
-    });
-    if (overlapping) throw new Error('Lease overlaps with an existing active lease for this local');
+    await checkOverlap(localId, start, end, lease.id);
   }
 
   const updateData = {};

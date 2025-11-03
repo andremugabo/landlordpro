@@ -14,6 +14,7 @@ async function createLease(req, res) {
       });
     }
 
+    // Call service to create lease with dynamic reference
     const lease = await leaseService.createLease({
       startDate,
       endDate,
@@ -23,7 +24,11 @@ async function createLease(req, res) {
       status,
     });
 
-    res.status(201).json({ success: true, message: 'Lease created successfully', lease });
+    res.status(201).json({
+      success: true,
+      message: 'Lease created successfully',
+      lease, // lease now includes reference as LEASE-TENANT-NAME-XXXX
+    });
   } catch (err) {
     console.error('Error creating lease:', err);
     res.status(400).json({ success: false, message: err.message });
@@ -66,7 +71,6 @@ async function getLease(req, res) {
 async function updateLease(req, res) {
   try {
     const lease = await leaseService.updateLease(req.params.id, req.body);
-
     res.status(200).json({ success: true, message: 'Lease updated successfully', lease });
   } catch (err) {
     console.error('Error updating lease:', err);
@@ -93,9 +97,9 @@ async function deleteLease(req, res) {
 async function triggerExpiredLeases(req, res) {
   try {
     const result = await leaseService.updateExpiredLeases();
-    res.status(200).json({ 
-      success: true, 
-      message: `${result.updatedCount} lease(s) marked as expired.` 
+    res.status(200).json({
+      success: true,
+      message: `${result.updatedCount} lease(s) marked as expired.`,
     });
   } catch (err) {
     console.error('Error triggering expired leases:', err);
