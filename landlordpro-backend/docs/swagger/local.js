@@ -43,46 +43,13 @@
  *           $ref: '#/components/schemas/Property'
  *         floor:
  *           $ref: '#/components/schemas/Floor'
- *     Property:
- *       type: object
- *       properties:
- *         id:
- *           type: string
- *           format: uuid
- *           example: "c56a4180-65aa-42ec-a945-5fd21dec0538"
- *         name:
- *           type: string
- *           example: "Sunset Apartments"
- *         location:
- *           type: string
- *           example: "Kigali, Rwanda"
- *         description:
- *           type: string
- *           example: "Luxury apartments in the city center"
- *     Floor:
- *       type: object
- *       properties:
- *         id:
- *           type: string
- *           format: uuid
- *           example: "d94a1b2c-1234-4ef7-89ab-5678cdef0123"
- *         name:
- *           type: string
- *           example: "Ground Floor"
- *         level_number:
- *           type: integer
- *           example: 0
- *         property_id:
- *           type: string
- *           format: uuid
- *           example: "c56a4180-65aa-42ec-a945-5fd21dec0538"
  */
 
 /**
  * @swagger
  * /api/locals:
  *   get:
- *     summary: Get all locals with pagination and optional filtering
+ *     summary: Get all locals with optional pagination and filtering by property or level
  *     tags: [Locals]
  *     security:
  *       - bearerAuth: []
@@ -92,24 +59,21 @@
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Page number
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 10
- *         description: Number of items per page
  *       - in: query
  *         name: propertyId
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Filter locals by property ID
  *       - in: query
- *         name: level
+ *         name: floorId
  *         schema:
- *           type: integer
- *         description: Filter locals by level
+ *           type: string
+ *           format: uuid
  *     responses:
  *       200:
  *         description: List of locals
@@ -136,7 +100,7 @@
  * @swagger
  * /api/locals/{id}:
  *   get:
- *     summary: Get a local by ID
+ *     summary: Get a single local by ID
  *     tags: [Locals]
  *     security:
  *       - bearerAuth: []
@@ -144,7 +108,6 @@
  *       - in: path
  *         name: id
  *         required: true
- *         description: Local ID
  *         schema:
  *           type: string
  *           format: uuid
@@ -168,7 +131,7 @@
  * @swagger
  * /api/locals:
  *   post:
- *     summary: Create a new local
+ *     summary: Create a new local (Admin only)
  *     tags: [Locals]
  *     security:
  *       - bearerAuth: []
@@ -189,17 +152,13 @@
  *               status:
  *                 type: string
  *                 enum: ["available", "occupied", "maintenance"]
- *                 example: "available"
  *               size_m2:
  *                 type: number
- *                 example: 45.5
  *               property_id:
  *                 type: string
  *                 format: uuid
- *                 example: "c56a4180-65aa-42ec-a945-5fd21dec0538"
  *               level:
  *                 type: integer
- *                 example: 0
  *     responses:
  *       201:
  *         description: Local created successfully
@@ -222,7 +181,7 @@
  * @swagger
  * /api/locals/{id}:
  *   put:
- *     summary: Update a local completely
+ *     summary: Update a local completely (Admin only)
  *     tags: [Locals]
  *     security:
  *       - bearerAuth: []
@@ -230,7 +189,6 @@
  *       - in: path
  *         name: id
  *         required: true
- *         description: Local ID
  *         schema:
  *           type: string
  *           format: uuid
@@ -264,7 +222,7 @@
  * @swagger
  * /api/locals/{id}:
  *   patch:
- *     summary: Partially update a local
+ *     summary: Partially update a local (Admin only)
  *     tags: [Locals]
  *     security:
  *       - bearerAuth: []
@@ -272,7 +230,6 @@
  *       - in: path
  *         name: id
  *         required: true
- *         description: Local ID
  *         schema:
  *           type: string
  *           format: uuid
@@ -308,7 +265,7 @@
  * @swagger
  * /api/locals/{id}:
  *   delete:
- *     summary: Soft delete a local
+ *     summary: Soft delete a local (Admin only)
  *     tags: [Locals]
  *     security:
  *       - bearerAuth: []
@@ -316,7 +273,6 @@
  *       - in: path
  *         name: id
  *         required: true
- *         description: Local ID
  *         schema:
  *           type: string
  *           format: uuid
@@ -331,7 +287,7 @@
  * @swagger
  * /api/locals/{id}/restore:
  *   patch:
- *     summary: Restore a soft-deleted local (Admins only)
+ *     summary: Restore a soft-deleted local (Admin only)
  *     tags: [Locals]
  *     security:
  *       - bearerAuth: []
@@ -339,7 +295,6 @@
  *       - in: path
  *         name: id
  *         required: true
- *         description: Local ID to restore
  *         schema:
  *           type: string
  *           format: uuid
@@ -347,7 +302,7 @@
  *       200:
  *         description: Local restored successfully
  *       403:
- *         description: Forbidden (only admins)
+ *         description: Forbidden (Admins only)
  *       404:
  *         description: Local not found
  */
@@ -356,7 +311,7 @@
  * @swagger
  * /api/locals/{id}/status:
  *   patch:
- *     summary: Update the status of a local
+ *     summary: Update the status of a local (authenticated users)
  *     tags: [Locals]
  *     security:
  *       - bearerAuth: []
@@ -364,7 +319,6 @@
  *       - in: path
  *         name: id
  *         required: true
- *         description: ID of the local to update
  *         schema:
  *           type: string
  *           format: uuid
@@ -391,7 +345,7 @@
 
 /**
  * @swagger
- * /api/locals/property/{propertyId}:
+ * /api/properties/{propertyId}/locals:
  *   get:
  *     summary: Get all locals for a specific property
  *     tags: [Locals]
@@ -401,7 +355,6 @@
  *       - in: path
  *         name: propertyId
  *         required: true
- *         description: ID of the property
  *         schema:
  *           type: string
  *           format: uuid

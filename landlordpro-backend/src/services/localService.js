@@ -4,7 +4,6 @@ const Floor = require('../models/Floor');
 
 /**
  * Get all locals with optional pagination and filtering by property and floor
- * Excludes soft-deleted entries automatically because of `paranoid: true`
  */
 async function getAllLocals({ page = 1, limit = 10, propertyId = null, floorId = null } = {}) {
   const offset = (page - 1) * limit;
@@ -52,25 +51,39 @@ async function getLocalById(id) {
 }
 
 /**
- * Helper: validate level against property
+ * Validate level for a property and return the floor
  */
 async function validateLevel(property_id, level) {
   const property = await Property.findByPk(property_id);
-  if (!property) throw new Error('Property not found for this local.');
+  if (!property) {
+    const err = new Error('Property not found for this local.');
+    err.status = 404;
+    throw err;
+  }
 
   if (level > property.number_of_floors) {
-    throw new Error(`Invalid level: property only has ${property.number_of_floors} floors above ground.`);
+    const err = new Error(`Invalid level: property only has ${property.number_of_floors} floors above ground.`);
+    err.status = 400;
+    throw err;
   }
   if (level < 0 && !property.has_basement) {
-    throw new Error('This property does not have a basement.');
+    const err = new Error('This property does not have a basement.');
+    err.status = 400;
+    throw err;
   }
   if (level < -1) {
-    throw new Error('Invalid level: basement can only be level -1.');
+    const err = new Error('Invalid level: basement can only be level -1.');
+    err.status = 400;
+    throw err;
   }
 
-  // Return the floor matching the level
   const floor = await Floor.findOne({ where: { property_id, level_number: level } });
-  if (!floor) throw new Error('Floor does not exist for this level.');
+  if (!floor) {
+    const err = new Error('Floor does not exist for this level.');
+    err.status = 400;
+    throw err;
+  }
+
   return floor;
 }
 
@@ -78,7 +91,7 @@ async function validateLevel(property_id, level) {
  * Create a new local
  */
 async function createLocal({ reference_code, status = 'available', size_m2, property_id, level }) {
-  // Check for duplicate reference_code
+  // Check duplicate reference_code
   const existing = await Local.findOne({ where: { reference_code } });
   if (existing) {
     const err = new Error(`A local with reference code "${reference_code}" already exists.`);
@@ -86,21 +99,14 @@ async function createLocal({ reference_code, status = 'available', size_m2, prop
     throw err;
   }
 
-  // Validate level and get corresponding floor
   if (level === undefined || level === null) {
     const err = new Error('Level is required');
     err.status = 400;
     throw err;
   }
 
-  const floor = await Floor.findOne({ where: { property_id, level_number: level } });
-  if (!floor) {
-    const err = new Error('Floor not found for the given property and level');
-    err.status = 400;
-    throw err;
-  }
+  const floor = await validateLevel(property_id, level);
 
-  // Create the local using the floor's ID
   return await Local.create({
     reference_code,
     status,
@@ -111,14 +117,12 @@ async function createLocal({ reference_code, status = 'available', size_m2, prop
   });
 }
 
-
 /**
  * Update a local
  */
 async function updateLocal(id, { reference_code, status, size_m2, property_id, level }) {
   const local = await getLocalById(id);
 
-  // Check for duplicate reference_code if it's being updated
   if (reference_code && reference_code !== local.reference_code) {
     const existing = await Local.findOne({ where: { reference_code } });
     if (existing) {
@@ -143,7 +147,6 @@ async function updateLocal(id, { reference_code, status, size_m2, property_id, l
     floor_id
   });
 }
-
 
 /**
  * Soft delete a local

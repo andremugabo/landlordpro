@@ -14,7 +14,7 @@ async function getAllLocals(req, res) {
     res.status(200).json({ success: true, ...data });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(err.status || 500).json({ success: false, message: err.message });
   }
 }
 
@@ -28,7 +28,7 @@ async function getLocalsByPropertyId(req, res) {
     res.status(200).json({ success: true, locals: data.locals });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(err.status || 500).json({ success: false, message: err.message });
   }
 }
 
@@ -53,9 +53,8 @@ async function createLocal(req, res) {
   try {
     const { reference_code, status, size_m2, property_id, level } = req.body;
 
-    if (level === undefined || level === null) {
-      throw new Error('Level is required');
-    }
+    if (!property_id) throw new Error('Property ID is required');
+    if (level === undefined || level === null) throw new Error('Level is required');
 
     const local = await localService.createLocal({
       reference_code,
@@ -67,12 +66,10 @@ async function createLocal(req, res) {
 
     res.status(201).json({ success: true, message: 'Local created successfully', local });
   } catch (err) {
+    console.error(err);
     res.status(err.status || 400).json({ success: false, message: err.message });
   }
 }
-
-
-
 
 /**
  * Update a local
@@ -111,7 +108,7 @@ async function restoreLocal(req, res) {
     const { id } = req.params;
     const user = req.user;
     await localService.restoreLocal(id, user);
-    const local = await localService.getLocalById(id); // fetch restored local
+    const local = await localService.getLocalById(id);
     res.status(200).json({ success: true, message: 'Local restored successfully', local });
   } catch (err) {
     console.error(err);
@@ -134,12 +131,10 @@ async function updateLocalStatus(req, res) {
   }
 }
 
-
-
 module.exports = {
   getAllLocals,
   getLocalById,
-  createLocal,
+  createLocal, // enabled
   updateLocal,
   deleteLocal,
   restoreLocal,
