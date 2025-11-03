@@ -6,17 +6,17 @@ const { validate: isUuid } = require('uuid');
 // -------------------- HELPER: STANDARD ERROR RESPONSE --------------------
 const handleError = (res, err, context = 'Operation') => {
   console.error(`${context} error:`, err);
-  
+
   if (err.message === 'Expense not found') {
     return res.status(404).json({ success: false, message: err.message });
   }
-  
+
   if (err.message.includes('required') || err.message.includes('Invalid')) {
     return res.status(400).json({ success: false, message: err.message });
   }
-  
-  res.status(500).json({ 
-    success: false, 
+
+  res.status(500).json({
+    success: false,
     message: 'Internal server error',
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
@@ -78,9 +78,9 @@ const getAllExpenses = async (req, res) => {
     };
 
     const result = await expenseService.getAllExpenses(filters);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       data: result.expenses,
       pagination: {
         total: result.total,
@@ -184,16 +184,16 @@ const bulkUpdatePaymentStatus = async (req, res) => {
     const { expenseIds, paymentStatus, paymentDate, paymentMethod } = req.body;
 
     if (!expenseIds || !paymentStatus) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'expenseIds and paymentStatus are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'expenseIds and paymentStatus are required'
       });
     }
 
     const result = await expenseService.bulkUpdatePaymentStatus(
-      expenseIds, 
-      paymentStatus, 
-      paymentDate, 
+      expenseIds,
+      paymentStatus,
+      paymentDate,
       paymentMethod
     );
 
@@ -209,9 +209,9 @@ const getExpensesByEntity = async (req, res) => {
     const { entityType, entityId } = req.params;
 
     if (!['property', 'local'].includes(entityType)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid entity type. Must be "property" or "local"' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid entity type. Must be "property" or "local"'
       });
     }
 
@@ -248,10 +248,10 @@ const approveExpense = async (req, res) => {
     }
 
     const expense = await expenseService.approveExpense(id, approvedBy);
-    res.json({ 
-      success: true, 
-      message: 'Expense approved successfully', 
-      data: expense 
+    res.json({
+      success: true,
+      message: 'Expense approved successfully',
+      data: expense
     });
   } catch (err) {
     handleError(res, err, 'Approve expense');
@@ -266,7 +266,10 @@ const getOverdueExpenses = async (req, res) => {
       localId: req.query.localId,
     };
 
-    const expenses = await expenseService.getOverdueExpenses(filters);
+    // Optional query param to trigger notifications
+    const notify = req.query.notify === 'true';
+
+    const expenses = await expenseService.getOverdueExpenses(filters, notify);
     res.json({ success: true, data: expenses, count: expenses.length });
   } catch (err) {
     handleError(res, err, 'Get overdue expenses');

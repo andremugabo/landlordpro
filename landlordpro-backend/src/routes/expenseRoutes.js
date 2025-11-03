@@ -9,7 +9,7 @@ router.use(authenticate);
 
 // 📊 AGGREGATE/SUMMARY ROUTES (must come before parameterized routes)
 router.get('/expenses/summary', expenseController.getExpenseSummary);
-router.get('/expenses/overdue', expenseController.getOverdueExpenses);
+router.get('/expenses/overdue', expenseController.getOverdueExpenses); 
 router.get('/expenses/entity/:entityType/:entityId', expenseController.getExpensesByEntity);
 
 // 🔄 BULK OPERATIONS (admin only)
@@ -17,11 +17,21 @@ router.patch('/expenses/bulk/payment-status', adminOnly, expenseController.bulkU
 
 // 📝 COLLECTION ROUTES
 router.get('/expenses', expenseController.getAllExpenses);
-router.post('/expenses', uploadProof.single('proof'), processProof, expenseController.createExpense);
+router.post(
+  '/expenses',
+  uploadProof.single('proof'),
+  processProof,
+  expenseController.createExpense
+);
 
 // 🔍 INDIVIDUAL RESOURCE ROUTES
 router.get('/expenses/:id', expenseController.getExpenseById);
-router.put('/expenses/:id', uploadProof.single('proof'), processProof, expenseController.updateExpense);
+router.put(
+  '/expenses/:id',
+  uploadProof.single('proof'),
+  processProof,
+  expenseController.updateExpense
+);
 router.delete('/expenses/:id', adminOnly, expenseController.deleteExpense);
 
 // 🎯 SPECIFIC ACTIONS ON INDIVIDUAL RESOURCES

@@ -4,6 +4,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { Op } = require('sequelize');
+const Notification = require('../models/Notification'); // Added for notifications
 
 // -------------------- HELPER: DELETE FILE --------------------
 const deleteProofFile = async (proofPath) => {
@@ -361,8 +362,8 @@ const approveExpense = async (id, approvedBy) => {
   return expense;
 };
 
-// 📅 Get overdue expenses
-const getOverdueExpenses = async (filters = {}) => {
+// 📅 Get overdue expenses and create notifications
+const getOverdueExpenses = async (filters = {}, notify = false) => {
   const where = {
     payment_status: {
       [Op.in]: ['pending', 'overdue'],
@@ -380,6 +381,33 @@ const getOverdueExpenses = async (filters = {}) => {
     order: [['due_date', 'ASC']],
     paranoid: true,
   });
+
+  if (notify && expenses.length > 0) {
+    for (const expense of expenses) {
+      // Check if notification already exists in last 2 days
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+      const existingNotification = await Notification.findOne({
+        where: {
+          expense_id: expense.id,
+          createdAt: { [Op.gte]: twoDaysAgo },
+        },
+      });
+
+      if (!existingNotification) {
+        await Notification.create({
+          id: uuidv4(),
+          user_id: expense.created_by || null,
+          message: `Expense "${expense.description}" is overdue. Amount: ${expense.amount} ${expense.currency}`,
+          type: 'expense-overdue',
+          payment_id: null,
+          lease_id: null,
+          document_id: null,
+        });
+      }
+    }
+  }
 
   return expenses;
 };
