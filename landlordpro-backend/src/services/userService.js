@@ -10,7 +10,6 @@ async function registerUser(data) {
   const { error, value } = registerSchema.validate(data);
   if (error) throw new Error(error.details[0].message);
 
-  // Check if email already exists
   const existing = await User.findOne({ where: { email: value.email } });
   if (existing) throw new Error('Email already registered');
 
@@ -21,7 +20,6 @@ async function registerUser(data) {
     password_hash: hashed,
   });
 
-  // Optional: Create notification for new user
   await Notification.create({
     user_id: user.id,
     message: 'Welcome! Your account has been created successfully.',
@@ -49,7 +47,6 @@ async function loginUser(data) {
     { expiresIn: '1h' }
   );
 
-  // Exclude password before returning
   const { password_hash, ...safeUser } = user.toJSON();
   return { user: safeUser, token };
 }
@@ -84,10 +81,56 @@ async function updateUser(id, data) {
   return user;
 }
 
-async function disableUser(id) {
+// --- Separate password update ---
+async function updateUserPassword(id, { oldPassword, newPassword }) {
+  if (!newPassword) throw new Error('New password is required');
+
   const user = await User.findByPk(id);
   if (!user) throw new Error('User not found');
 
+  const isDefaultPassword = await bcrypt.compare('123456', user.password_hash);
+
+  if (!isDefaultPassword) {
+    if (!oldPassword) throw new Error('Old password is required');
+    const match = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!match) throw new Error('Old password is incorrect');
+  }
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+  user.password_hash = hashed;
+  await user.save();
+
+  await Notification.create({
+    user_id: user.id,
+    message: 'Your password has been updated successfully.',
+    type: 'user_update_password',
+  });
+
+  return { message: 'Password updated successfully' };
+}
+
+// --- Separate profile picture update ---
+async function updateUserPicture(id, picturePath) {
+  if (!picturePath) throw new Error('Picture path is required');
+
+  const user = await User.findByPk(id);
+  if (!user) throw new Error('User not found');
+
+  user.profile_picture = picturePath;
+  await user.save();
+
+  await Notification.create({
+    user_id: id,
+    message: 'Your profile picture has been updated.',
+    type: 'user_update_picture',
+  });
+
+  return user;
+}
+
+async function disableUser(id) {
+  const user = await User.findByPk(id);
+  if (!user) throw new Error('User not found');
   if (!user.is_active) throw new Error('User is already disabled');
 
   await user.update({ is_active: false });
@@ -104,7 +147,6 @@ async function disableUser(id) {
 async function enableUser(id) {
   const user = await User.findByPk(id);
   if (!user) throw new Error('User not found');
-
   if (user.is_active) throw new Error('User is already enabled');
 
   await user.update({ is_active: true });
@@ -124,7 +166,7 @@ async function getAllNotifications({ page = 1, limit = 10 } = {}) {
   const offset = (page - 1) * limit;
   const { count, rows } = await Notification.findAndCountAll({
     include: [{ model: User, as: 'user', attributes: ['id', 'full_name', 'email'] }],
-    order: [['created_at', 'DESC']], // fixed column name
+    order: [['created_at', 'DESC']],
     limit,
     offset,
   });
@@ -135,7 +177,7 @@ async function getUnreadNotifications({ userId, page = 1, limit = 10 }) {
   const offset = (page - 1) * limit;
   const { count, rows } = await Notification.findAndCountAll({
     where: { user_id: userId, is_read: false },
-    order: [['created_at', 'DESC']], 
+    order: [['created_at', 'DESC']],
     limit,
     offset,
   });
@@ -155,6 +197,8 @@ module.exports = {
   loginUser,
   getAllUsers,
   updateUser,
+  updateUserPassword,
+  updateUserPicture,
   disableUser,
   enableUser,
   getAllNotifications,

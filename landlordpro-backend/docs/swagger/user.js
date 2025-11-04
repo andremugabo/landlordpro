@@ -2,7 +2,7 @@
  * @swagger
  * tags:
  *   name: Users
- *   description: User management and authentication
+ *   description: User management, authentication, and profile
  */
 
 /**
@@ -29,6 +29,9 @@
  *         is_active:
  *           type: boolean
  *           example: true
+ *         profile_picture:
+ *           type: string
+ *           example: "/uploads/avatars/f47ac10b-58cc-4372-a567-0e02b2c3d479/avatar.jpg"
  *         created_at:
  *           type: string
  *           format: date-time
@@ -271,4 +274,81 @@
  *         description: Forbidden
  *       404:
  *         description: User not found
+ */
+
+/**
+ * @swagger
+ * /api/profile/password:
+ *   put:
+ *     summary: Update logged-in user's password
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - newPassword
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *                 example: "oldPassword123"
+ *               newPassword:
+ *                 type: string
+ *                 example: "NewPassword123!"
+ *     responses:
+ *       200:
+ *         description: Password updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * /api/profile/picture:
+ *   put:
+ *     summary: Update logged-in user's profile picture
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Profile picture updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Validation error or no file uploaded
+ *       401:
+ *         description: Unauthorized
  */

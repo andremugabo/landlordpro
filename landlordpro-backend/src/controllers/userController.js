@@ -3,6 +3,8 @@ const {
   loginUser: loginService,
   getAllUsers: getAllUsersService,
   updateUser: updateService,
+  updateUserPassword: updatePasswordService,
+  updateUserPicture: updatePictureService,
   disableUser: disableService,
   enableUser: enableService,
   getAllNotifications: getAllNotificationsService,
@@ -12,7 +14,6 @@ const {
 
 // --- Auth Controllers ---
 
-// Register new user (Admin only)
 async function registerUser(req, res) {
   try {
     if (req.user?.role !== 'admin')
@@ -26,10 +27,9 @@ async function registerUser(req, res) {
   }
 }
 
-// Login user
 async function loginUser(req, res) {
   try {
-    const { user, token } = await loginService(req.body); // user already sanitized
+    const { user, token } = await loginService(req.body);
     res.status(200).json({ success: true, user, token });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -58,6 +58,38 @@ async function updateUser(req, res) {
       return res.status(403).json({ success: false, message: 'Forbidden' });
 
     const user = await updateService(req.params.id, req.body);
+    const { password_hash, ...userData } = user.toJSON();
+    res.status(200).json({ success: true, user: userData });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+}
+
+// --- Separate controllers for password & picture ---
+
+// Update user password
+async function updatePassword(req, res) {
+  try {
+    const userId = req.user?.role === 'admin' && req.body.userId ? req.body.userId : req.user.id;
+    const { oldPassword, newPassword } = req.body;
+
+    const result = await updatePasswordService(userId, { oldPassword, newPassword });
+    res.status(200).json({ success: true, message: result.message });
+  } catch (error) {
+    const status = error.message.includes('not found') ? 404 : 400;
+    res.status(status).json({ success: false, message: error.message });
+  }
+}
+
+// Update user profile picture
+async function updatePicture(req, res) {
+  try {
+    const userId = req.user.id;
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+
+    const picturePath = `/uploads/avatars/${req.file.filename}`;
+    const user = await updatePictureService(userId, picturePath);
+
     const { password_hash, ...userData } = user.toJSON();
     res.status(200).json({ success: true, user: userData });
   } catch (error) {
@@ -95,7 +127,6 @@ async function enableUser(req, res) {
 
 // --- Notifications Controllers ---
 
-// ✅ Get all notifications for logged-in user (read + unread)
 async function getNotifications(req, res) {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -114,7 +145,6 @@ async function getNotifications(req, res) {
   }
 }
 
-// Get unread notifications for logged-in user
 async function getUnreadNotifications(req, res) {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -138,7 +168,6 @@ async function getUnreadNotifications(req, res) {
   }
 }
 
-// Mark notification as read
 async function markNotificationRead(req, res) {
   try {
     const notification = await markNotificationReadService(req.params.id, req.user.id);
@@ -149,7 +178,6 @@ async function markNotificationRead(req, res) {
   }
 }
 
-// Get all notifications (Admin)
 async function getAllNotifications(req, res) {
   try {
     if (req.user.role !== 'admin')
@@ -171,11 +199,11 @@ async function getAllNotifications(req, res) {
   }
 }
 
+// --- Profile Controllers ---
 
-// Get current user profile
 async function getProfile(req, res) {
   try {
-    const user = req.user; // already attached by authenticate middleware
+    const user = req.user;
     const { password_hash, ...userData } = user.toJSON();
     res.status(200).json({ success: true, user: userData });
   } catch (error) {
@@ -183,7 +211,6 @@ async function getProfile(req, res) {
   }
 }
 
-// Update current user profile
 async function updateProfile(req, res) {
   try {
     const user = req.user;
@@ -203,6 +230,8 @@ module.exports = {
   loginUser,
   getAllUsers,
   updateUser,
+  updatePassword,
+  updatePicture,
   disableUser,
   enableUser,
   getNotifications,
