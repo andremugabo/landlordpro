@@ -41,6 +41,10 @@
  *                       type: string
  *                       enum: [admin, manager, employee]
  *                       example: "manager"
+ *                     avatar:
+ *                       type: string
+ *                       description: URL to the user's profile picture
+ *                       example: "/uploads/avatars/f47ac10b/avatar.png"
  *                     is_active:
  *                       type: boolean
  *                       example: true
@@ -77,6 +81,10 @@
  *               email:
  *                 type: string
  *                 example: "john@example.com"
+ *               avatar:
+ *                 type: string
+ *                 description: URL or path to the profile picture
+ *                 example: "/uploads/avatars/f47ac10b/avatar.png"
  *     responses:
  *       200:
  *         description: Profile updated successfully
@@ -105,6 +113,10 @@
  *                       type: string
  *                       enum: [admin, manager, employee]
  *                       example: "manager"
+ *                     avatar:
+ *                       type: string
+ *                       description: URL to the user's profile picture
+ *                       example: "/uploads/avatars/f47ac10b/avatar.png"
  *                     is_active:
  *                       type: boolean
  *                       example: true
