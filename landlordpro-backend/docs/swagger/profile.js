@@ -64,14 +64,14 @@
  * @swagger
  * /api/profile:
  *   put:
- *     summary: Update the authenticated user's profile
+ *     summary: Update the authenticated user's profile (can include profile picture)
  *     tags: [Profile]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
@@ -83,8 +83,8 @@
  *                 example: "john@example.com"
  *               avatar:
  *                 type: string
- *                 description: URL or path to the profile picture
- *                 example: "/uploads/avatars/f47ac10b/avatar.png"
+ *                 format: binary
+ *                 description: Upload a profile picture
  *     responses:
  *       200:
  *         description: Profile updated successfully
