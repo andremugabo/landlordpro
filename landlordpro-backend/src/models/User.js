@@ -11,6 +11,7 @@ User.init({
   full_name: { type: DataTypes.STRING, allowNull: false },
   role: { type: DataTypes.ENUM('admin', 'manager', 'employee'), defaultValue: 'employee' },
   picture: {type: DataTypes.STRING, allowNull:true},
+  phone: {type: DataTypes.STRING,allowNull:true},
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
   created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 }, {

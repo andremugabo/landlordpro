@@ -4,7 +4,7 @@ const floorController = require('../controllers/floorController');
 
 // Middleware
 const { authenticate, adminOnly, managerOrAdminOnly } = require('../middleware/authMiddleware');
-const verifyManagerAccess = require('../middleware/verifyManagerAccess'); // can verify floor's property
+const verifyManagerAccess = require('../middleware/verifyManagerAccess');
 
 // ======================================
 // 🔐 All routes protected
@@ -12,13 +12,41 @@ const verifyManagerAccess = require('../middleware/verifyManagerAccess'); // can
 router.use(authenticate);
 
 // ================================
-// 📊 Occupancy Reports
+// 🏢 PROPERTY-SPECIFIC FLOOR ROUTES
 // ================================
+router.get(
+  '/floors/property/:propertyId',
+  managerOrAdminOnly,
+  floorController.getFloorsByPropertyId
+);
+
+router.get(
+  '/floors/property/:propertyId/simple',
+  managerOrAdminOnly,
+  floorController.getPropertyFloors
+);
+
+// ================================
+// 📊 ANALYTICS & REPORTS
+// ================================
+router.get(
+  '/floors/summary',
+  managerOrAdminOnly,
+  floorController.getFloorsSummary
+);
+
+router.get(
+  '/floors/stats',
+  managerOrAdminOnly,
+  floorController.getFloorsWithStats
+);
+
 router.get(
   '/floors/reports/occupancy',
   managerOrAdminOnly,
   floorController.getAllFloorsOccupancy
 );
+
 router.get(
   '/floors/:id/occupancy',
   managerOrAdminOnly,
@@ -27,7 +55,7 @@ router.get(
 );
 
 // ================================
-// 📋 CRUD (Read/Update/Delete)
+// 🔧 CRUD OPERATIONS
 // ================================
 router.get(
   '/floors',
@@ -44,7 +72,7 @@ router.get(
 
 router.put(
   '/floors/:id',
-  adminOnly, // only admins can update floor details
+  adminOnly,
   floorController.updateFloor
 );
 
@@ -53,7 +81,5 @@ router.delete(
   adminOnly, 
   floorController.deleteFloor
 );
-
-
 
 module.exports = router;

@@ -3,9 +3,9 @@ import {
   getAllLocals, 
   createLocal, 
   updateLocal, 
-  softDeleteLocal, 
+  deleteLocal,  // <-- added
   restoreLocal, 
-  updateLocalStatus 
+  updateLocalStatus  
 } from '../../services/localService';
 import { getAllProperties } from '../../services/propertyService';
 import { Button, Modal, Input, Card, Select } from '../../components';

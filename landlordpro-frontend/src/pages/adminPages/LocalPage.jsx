@@ -3,13 +3,13 @@ import {
   getAllLocals, 
   createLocal, 
   updateLocal, 
-  softDeleteLocal, 
+  deleteLocal, 
   restoreLocal, 
-  updateLocalStatus 
+  updateLocalStatus   
 } from '../../services/localService';
 import { getAllProperties } from '../../services/propertyService';
-import { Button, Modal, Input, Card, Select } from '../../components';
-import { FiEdit, FiPlus, FiTrash, FiSearch, FiRefreshCcw } from 'react-icons/fi';
+import { Button, Modal, Input, Card, Select, Badge } from '../../components';
+import { FiEdit, FiPlus, FiTrash, FiSearch, FiRefreshCcw, FiHome, FiLayers } from 'react-icons/fi';
 import { showSuccess, showError, showInfo } from '../../utils/toastHelper';
 
 const LocalPage = () => {
@@ -19,32 +19,35 @@ const LocalPage = () => {
   const [selectedLocal, setSelectedLocal] = useState(null);
   const [editData, setEditData] = useState({ 
     reference_code: '', 
-    status: 'available', // Default value set here
+    status: 'available',
     size_m2: '', 
     property_id: '', 
     level: '' 
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [limit] = useState(10);
 
   // Status options for consistency
   const statusOptions = [
-    { value: 'available', label: 'Available' },
-    { value: 'occupied', label: 'Occupied' },
-    { value: 'maintenance', label: 'Maintenance' },
+    { value: 'available', label: 'Available', color: 'green' },
+    { value: 'occupied', label: 'Occupied', color: 'blue' },
+    { value: 'maintenance', label: 'Maintenance', color: 'yellow' },
   ];
 
   // Fetch locals
-  const fetchLocals = async (pageNumber = 1) => {
+  const fetchLocals = async (pageNumber = page) => {
     try {
       setLoading(true);
-      const data = await getAllLocals(pageNumber, 10);
-      setLocals(data.locals || []);
+      const data = await getAllLocals({ page: pageNumber, limit });
+      setLocals(data.data || data.locals || []);
       setTotalPages(data.totalPages || 1);
       setPage(data.page || pageNumber);
     } catch (err) {
+      console.error('Error fetching locals:', err);
       showError(err?.message || 'Failed to fetch locals');
       setLocals([]);
     } finally {
@@ -58,16 +61,14 @@ const LocalPage = () => {
       const data = await getAllProperties(1, 100);
       setProperties(data.properties || []);
     } catch (err) {
+      console.error('Error fetching properties:', err);
       showError(err?.message || 'Failed to fetch properties');
       setProperties([]);
     }
   };
 
   useEffect(() => {
-    fetchLocals(page);
-  }, [page]);
-
-  useEffect(() => {
+    fetchLocals();
     fetchProperties();
   }, []);
 
@@ -93,6 +94,8 @@ const LocalPage = () => {
 
   // Create or update
   const handleSubmit = async () => {
+    if (submitting) return;
+    
     const { reference_code, status, size_m2, property_id, level } = editData;
     
     // Validation
@@ -105,10 +108,11 @@ const LocalPage = () => {
     if (!level?.trim()) {
       return showError('Level is required.');
     }
-    if (size_m2 && isNaN(Number(size_m2))) {
-      return showError('Size must be a valid number.');
+    if (size_m2 && (isNaN(Number(size_m2)) || Number(size_m2) <= 0)) {
+      return showError('Size must be a valid positive number.');
     }
 
+    setSubmitting(true);
     try {
       const payload = {
         reference_code: reference_code.trim(),
@@ -124,65 +128,78 @@ const LocalPage = () => {
       } else {
         await createLocal(payload);
         showSuccess('Local added successfully!');
-        setPage(1); // Go to first page to see new item
+        setPage(1);
       }
       
-      fetchLocals(page);
-      setModalOpen(false);
-      setSelectedLocal(null);
-      setEditData({ 
-        reference_code: '', 
-        status: 'available', 
-        size_m2: '', 
-        property_id: '', 
-        level: '' 
-      });
+      await fetchLocals(selectedLocal ? page : 1);
+      handleModalClose();
     } catch (err) {
+      console.error('Error saving local:', err);
       showError(err?.message || 'Failed to save local');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (local) => {
     if (!window.confirm(`Are you sure you want to delete local "${local.reference_code}"?`)) return;
     try {
-      await softDeleteLocal(local.id);
+      await deleteLocal(local.id);  // This now uses deleteLocal instead of softDeleteLocal
       showInfo('Local deleted successfully.');
-      fetchLocals(page);
+      await fetchLocals(page);
     } catch (err) {
+      console.error('Error deleting local:', err);
       showError(err?.message || 'Failed to delete local');
     }
   };
+
 
   const handleRestore = async (local) => {
     try {
       await restoreLocal(local.id);
       showSuccess('Local restored successfully.');
-      fetchLocals(page);
+      await fetchLocals(page);
     } catch (err) {
+      console.error('Error restoring local:', err);
       showError(err?.message || 'Failed to restore local');
     }
   };
 
   const handleStatusChange = async (local, newStatus) => {
-    if (local.status === newStatus) return; // No change
+    if (local.status === newStatus) return;
     
     try {
       await updateLocalStatus(local.id, newStatus);
       showSuccess('Status updated successfully.');
-      fetchLocals(page);
+      await fetchLocals(page);
     } catch (err) {
+      console.error('Error updating status:', err);
       showError(err?.message || 'Failed to update status');
     }
   };
 
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setSelectedLocal(null);
+    setEditData({ 
+      reference_code: '', 
+      status: 'available', 
+      size_m2: '', 
+      property_id: '', 
+      level: '' 
+    });
+  };
+
   // Filter locals
   const filteredLocals = useMemo(() => {
-    if (!searchTerm) return locals;
+    if (!Array.isArray(locals)) return [];
+    if (!searchTerm.trim()) return locals;
     
+    const searchLower = searchTerm.toLowerCase();
     return locals.filter(l =>
-      l.reference_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      l.property?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      l.level?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      l.reference_code?.toLowerCase().includes(searchLower) ||
+      l.property?.name?.toLowerCase().includes(searchLower) ||
+      l.level?.toString().toLowerCase().includes(searchLower)
     );
   }, [locals, searchTerm]);
 
@@ -192,27 +209,40 @@ const LocalPage = () => {
     [properties]
   );
 
+  // Get property name by ID
+  const getPropertyName = (propertyId) => {
+    const property = properties.find(p => p.id === propertyId);
+    return property?.name || '-';
+  };
+
   // Status badge component
   const StatusBadge = ({ status, deleted }) => {
     if (deleted) {
       return (
-        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-          Deleted
-        </span>
+        <Badge 
+          className="bg-red-100 text-red-800"
+          text="Deleted"
+        />
       );
     }
 
-    const colors = {
-      available: 'bg-green-100 text-green-800',
-      occupied: 'bg-blue-100 text-blue-800',
-      maintenance: 'bg-yellow-100 text-yellow-800',
-    };
+    const statusOption = statusOptions.find(opt => opt.value === status);
+    const colorClass = statusOption 
+      ? `bg-${statusOption.color}-100 text-${statusOption.color}-800`
+      : 'bg-gray-100 text-gray-800';
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
+      <Badge 
+        className={colorClass}
+        text={statusOption?.label || status}
+      />
     );
+  };
+
+  // Get status color for select
+  const getStatusColor = (status) => {
+    const statusOption = statusOptions.find(opt => opt.value === status);
+    return statusOption?.color || 'gray';
   };
 
   // Mobile card component
@@ -220,8 +250,14 @@ const LocalPage = () => {
     <Card className="p-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition">
       <div className="flex justify-between items-start mb-3">
         <div>
-          <h2 className="font-semibold text-gray-800 text-base">{local.reference_code}</h2>
-          <p className="text-xs text-gray-500">{local.property?.name || '-'}</p>
+          <h2 className="font-semibold text-gray-800 text-base flex items-center gap-1">
+            <FiLayers className="text-blue-500" />
+            {local.reference_code}
+          </h2>
+          <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+            <FiHome className="text-gray-400" />
+            {getPropertyName(local.property_id)}
+          </p>
         </div>
         <StatusBadge status={local.status} deleted={!!local.deleted_at} />
       </div>
@@ -229,7 +265,7 @@ const LocalPage = () => {
       <div className="grid grid-cols-2 gap-2 text-sm text-gray-700 mb-3">
         <div>
           <span className="text-gray-500 text-xs">Level:</span>
-          <div className="font-medium">{local.level ?? '-'}</div>
+          <div className="font-medium">{local.level || '-'}</div>
         </div>
         <div>
           <span className="text-gray-500 text-xs">Size:</span>
@@ -277,6 +313,14 @@ const LocalPage = () => {
     </Card>
   );
 
+  // Paginated locals
+  const paginatedLocals = useMemo(() => {
+    const startIndex = (page - 1) * limit;
+    return filteredLocals.slice(startIndex, startIndex + limit);
+  }, [filteredLocals, page, limit]);
+
+  const totalFilteredCount = filteredLocals.length;
+
   return (
     <div className="space-y-6 pt-12 px-3 sm:px-6">
       {/* Header */}
@@ -287,17 +331,7 @@ const LocalPage = () => {
         </div>
         <Button
           className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm transition w-full sm:w-auto justify-center"
-          onClick={() => {
-            setSelectedLocal(null);
-            setEditData({ 
-              reference_code: '', 
-              status: 'available', 
-              size_m2: '', 
-              property_id: '', 
-              level: '' 
-            });
-            setModalOpen(true);
-          }}
+          onClick={() => setModalOpen(true)}
         >
           <FiPlus className="text-base" /> Add Local
         </Button>
@@ -314,13 +348,43 @@ const LocalPage = () => {
         />
       </div>
 
+      {/* Stats Summary */}
+      {!loading && locals.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+            <div className="text-2xl font-bold text-gray-800">{locals.length}</div>
+            <div className="text-sm text-gray-500">Total Locals</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+            <div className="text-2xl font-bold text-green-600">
+              {locals.filter(l => l.status === 'available' && !l.deleted_at).length}
+            </div>
+            <div className="text-sm text-gray-500">Available</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+            <div className="text-2xl font-bold text-blue-600">
+              {locals.filter(l => l.status === 'occupied' && !l.deleted_at).length}
+            </div>
+            <div className="text-sm text-gray-500">Occupied</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+            <div className="text-2xl font-bold text-red-600">
+              {locals.filter(l => l.deleted_at).length}
+            </div>
+            <div className="text-sm text-gray-500">Deleted</div>
+          </div>
+        </div>
+      )}
+
       {/* Desktop Table */}
       <div className="hidden md:block">
         <Card className="bg-white rounded-xl shadow-md border border-gray-100 overflow-x-auto">
           {loading ? (
             <div className="p-8 text-center text-gray-500">Loading locals...</div>
-          ) : filteredLocals.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No locals found</div>
+          ) : paginatedLocals.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              {locals.length === 0 ? 'No locals found' : 'No locals match your search'}
+            </div>
           ) : (
             <table className="min-w-full text-sm text-gray-700">
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 text-xs uppercase">
@@ -334,12 +398,22 @@ const LocalPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredLocals.map(local => (
-                  <tr key={local.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-3 font-medium text-gray-800">{local.reference_code}</td>
-                    <td className="p-3">{local.property?.name || '-'}</td>
-                    <td className="p-3">{local.level ?? '-'}</td>
-                    <td className="p-3">{local.size_m2 || '-'}</td>
+                {paginatedLocals.map(local => (
+                  <tr key={local.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                    <td className="p-3 font-medium text-gray-800">
+                      <div className="flex items-center gap-2">
+                        <FiLayers className="text-blue-500" />
+                        {local.reference_code}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        <FiHome className="text-gray-400" />
+                        {getPropertyName(local.property_id)}
+                      </div>
+                    </td>
+                    <td className="p-3">{local.level || '-'}</td>
+                    <td className="p-3">{local.size_m2 ? `${local.size_m2} m²` : '-'}</td>
                     <td className="p-3">
                       {!local.deleted_at ? (
                         <Select
@@ -389,113 +463,107 @@ const LocalPage = () => {
       <div className="md:hidden flex flex-col gap-4">
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading locals...</div>
-        ) : filteredLocals.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No locals found</div>
+        ) : paginatedLocals.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            {locals.length === 0 ? 'No locals found' : 'No locals match your search'}
+          </div>
         ) : (
-          filteredLocals.map(local => <MobileCard key={local.id} local={local} />)
+          paginatedLocals.map(local => <MobileCard key={local.id} local={local} />)
         )}
       </div>
 
       {/* Pagination */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-2 px-4 py-3 border-t border-gray-100 bg-white text-sm text-gray-600 rounded-lg shadow-sm">
-        <div className="text-gray-500 mb-2 sm:mb-0">
-          Page <span className="font-medium">{page}</span> of <span className="font-medium">{totalPages}</span>
+      {!loading && filteredLocals.length > 0 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-2 px-4 py-3 border-t border-gray-100 bg-white text-sm text-gray-600 rounded-lg shadow-sm">
+          <div className="text-gray-500 mb-2 sm:mb-0">
+            Showing <span className="font-medium">{paginatedLocals.length}</span> of{' '}
+            <span className="font-medium">{totalFilteredCount}</span> locals
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+              disabled={page <= 1}
+              className={`px-3 py-1 rounded-md border text-xs font-medium transition ${
+                page <= 1 
+                  ? 'text-gray-300 border-gray-200 cursor-not-allowed' 
+                  : 'text-gray-700 border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              ← Prev
+            </button>
+            <span className="px-2 text-gray-500 text-xs">
+              Page {page} of {Math.ceil(totalFilteredCount / limit)}
+            </span>
+            <button
+              onClick={() => setPage(prev => Math.min(prev + 1, Math.ceil(totalFilteredCount / limit)))}
+              disabled={page >= Math.ceil(totalFilteredCount / limit)}
+              className={`px-3 py-1 rounded-md border text-xs font-medium transition ${
+                page >= Math.ceil(totalFilteredCount / limit)
+                  ? 'text-gray-300 border-gray-200 cursor-not-allowed' 
+                  : 'text-gray-700 border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              Next →
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-            disabled={page <= 1}
-            className={`px-3 py-1 rounded-md border text-xs font-medium transition ${
-              page <= 1 
-                ? 'text-gray-300 border-gray-200 cursor-not-allowed' 
-                : 'text-gray-700 border-gray-300 hover:bg-gray-100'
-            }`}
-          >
-            ← Prev
-          </button>
-          <span className="px-2 text-gray-500 text-xs">{page}</span>
-          <button
-            onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={page >= totalPages}
-            className={`px-3 py-1 rounded-md border text-xs font-medium transition ${
-              page >= totalPages 
-                ? 'text-gray-300 border-gray-200 cursor-not-allowed' 
-                : 'text-gray-700 border-gray-300 hover:bg-gray-100'
-            }`}
-          >
-            Next →
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Modal */}
       {modalOpen && (
         <Modal
           title={selectedLocal ? 'Edit Local' : 'Add New Local'}
-          onClose={() => {
-            setModalOpen(false);
-            setSelectedLocal(null);
-          }}
+          onClose={handleModalClose}
           onSubmit={handleSubmit}
+          submitText={submitting ? (selectedLocal ? 'Updating...' : 'Creating...') : (selectedLocal ? 'Update' : 'Create')}
+          disabled={submitting}
         >
           <div className="space-y-4">
             <Input 
-              label="Reference Code" 
+              label="Reference Code *" 
               value={editData.reference_code} 
               onChange={(e) => setEditData({ ...editData, reference_code: e.target.value })} 
               placeholder="e.g., A-101"
+              required
             />
             
             <Select
-              label="Property"
-              value={
-                editData.property_id
-                  ? propertyOptions.find(p => p.value === editData.property_id)
-                  : { value: '', label: '— Select Property —', isDisabled: true }
-              }
-              options={[
-                { value: '', label: '— Select Property —', isDisabled: true },
-                ...propertyOptions,
-              ]}
+              label="Property *"
+              value={propertyOptions.find(p => p.value === editData.property_id) || null}
+              options={propertyOptions}
               onChange={(selected) => setEditData({ ...editData, property_id: selected?.value || '' })}
-              isOptionDisabled={(option) => option.isDisabled}
               placeholder="Select Property..."
               isSearchable
+              required
             />
 
-
             <Input 
-              label="Level" 
+              label="Level *" 
               value={editData.level} 
               onChange={(e) => setEditData({ ...editData, level: e.target.value })} 
               placeholder="e.g., Ground Floor, 1st Floor"
+              required
             />
             
             <Input 
               label="Size (m²)" 
               type="number"
+              min="0"
+              step="0.01"
               value={editData.size_m2} 
               onChange={(e) => setEditData({ ...editData, size_m2: e.target.value })} 
-              placeholder="e.g., 50"
+              placeholder="e.g., 50.5"
             />
             
             <Select
-              label="Status"
-              value={
-                editData.status
-                  ? statusOptions.find(opt => opt.value === editData.status)
-                  : { value: '', label: '— Select Status —', isDisabled: true }
-              }
-              options={[
-                { value: '', label: '— Select Status —', isDisabled: true },
-                ...statusOptions,
-              ]}
-              onChange={(selected) => setEditData({ ...editData, status: selected?.value || '' })}
-              isOptionDisabled={(option) => option.isDisabled}
+              label="Status *"
+              value={statusOptions.find(opt => opt.value === editData.status)}
+              options={statusOptions}
+              onChange={(selected) => setEditData({ ...editData, status: selected?.value || 'available' })}
               placeholder="Select Status..."
               isSearchable={false}
+              required
             />
-
           </div>
         </Modal>
       )}

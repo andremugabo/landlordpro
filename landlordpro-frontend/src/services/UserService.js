@@ -2,15 +2,22 @@
 import axios from 'axios';
 import { getToken } from './AuthService';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL + '/api'|| '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  ? `${import.meta.env.VITE_API_BASE_URL}/api`
+  : 'http://localhost:3000/api';
 
-/* Axios instance configured once */
+/* ----------------------------------------
+   ⚙️ Axios Instance
+---------------------------------------- */
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  timeout: 10000,
 });
 
-/* Attach token automatically */
+/* ----------------------------------------
+   🔐 Attach Token Automatically
+---------------------------------------- */
 api.interceptors.request.use(
   (config) => {
     const token = getToken();
@@ -20,82 +27,125 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-/* Centralized error handler */
-const handleRequest = async (promise) => {
+/* ----------------------------------------
+   ⚠️ Centralized Error Handler
+---------------------------------------- */
+const handleRequest = async (promise, customErrorMsg = null) => {
   try {
     const res = await promise;
     return res.data;
   } catch (err) {
+    const status = err.response?.status;
     const message =
-      err.response?.data?.message || err.message || 'Something went wrong';
-    console.error('API Error:', message);
+      err.response?.data?.message ||
+      customErrorMsg ||
+      `Request failed${status ? ` (HTTP ${status})` : ''}`;
+
+    console.error('API Error:', message, err.response?.data || err.message);
     throw new Error(message);
   }
 };
 
-/* =======================
-   👥 USERS (admin only)
-   ======================= */
+/* ================================
+   👥 USER MANAGEMENT
+================================ */
 
+/**
+ * Get all users (admin only)
+ */
 export const getAllUsers = async (page = 1, limit = 10) => {
-  const data = await handleRequest(
-    api.get(`/users?page=${page}&limit=${limit}`)
-  );
-  const { count, rows } = data;
+  const data = await handleRequest(api.get(`/users?page=${page}&limit=${limit}`));
   return {
-    users: rows,
-    totalPages: Math.ceil(count / limit),
+    users: data.rows || [],
+    total: data.count || 0,
+    totalPages: Math.ceil((data.count || 0) / limit),
     page,
   };
 };
 
+/**
+ * Update a user (admin only)
+ */
 export const updateUser = (id, userObj) =>
   handleRequest(api.put(`/users/${id}`, userObj));
 
+/**
+ * Disable a user
+ */
 export const disableUser = (id) =>
   handleRequest(api.put(`/users/${id}/disable`));
 
+/**
+ * Enable a user
+ */
 export const enableUser = (id) =>
   handleRequest(api.put(`/users/${id}/enable`));
 
+/**
+ * Register a new user (admin only)
+ */
 export const registerUser = (userObj) =>
   handleRequest(api.post('/auth/register', userObj));
 
-/* =======================
-   🔔 NOTIFICATIONS
-   ======================= */
-
-export const getNotifications = (page = 1, limit = 10) =>
-  handleRequest(api.get(`/notifications?page=${page}&limit=${limit}`));
-
-export const getUnreadNotifications = (page = 1, limit = 10) =>
-  handleRequest(api.get(`/notifications/unread?page=${page}&limit=${limit}`));
-
-export const markNotificationRead = (id) =>
-  handleRequest(api.put(`/notifications/${id}/read`));
-
-export const getAllNotifications = (page = 1, limit = 10) =>
-  handleRequest(api.get(`/notifications/all?page=${page}&limit=${limit}`));
-
-/* =======================
+/* ================================
    👤 PROFILE
-   ======================= */
+================================ */
 
+/**
+ * Get logged-in user's profile
+ */
 export const getProfile = () => handleRequest(api.get('/profile'));
 
+/**
+ * Update profile details
+ */
 export const updateProfile = (data) =>
   handleRequest(api.put('/profile', data));
 
-/* =======================
-   📁 OPTIONAL: FILE UPLOADS
-   ======================= */
-// Example for avatar upload
+/**
+ * Update password
+ */
+export const updatePassword = (payload) =>
+  handleRequest(api.put('/profile/password', payload));
+
+/**
+ * Upload avatar/profile picture
+ */
 export const uploadAvatar = (file) => {
   const formData = new FormData();
   formData.append('avatar', file);
   return handleRequest(
-    api.post('/profile/avatar', formData, {
+    api.put('/profile/picture', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    }),
+    'Failed to upload avatar'
   );
+};
+
+/* ================================
+   🔔 NOTIFICATIONS
+================================ */
+
+/** Get notifications (user-specific) */
+export const getNotifications = (page = 1, limit = 10) =>
+  handleRequest(api.get(`/notifications?page=${page}&limit=${limit}`));
+
+/** Get unread notifications */
+export const getUnreadNotifications = (page = 1, limit = 10) =>
+  handleRequest(api.get(`/notifications/unread?page=${page}&limit=${limit}`));
+
+/** Mark notification as read */
+export const markNotificationRead = (id) =>
+  handleRequest(api.put(`/notifications/${id}/read`));
+
+/* ================================
+   🔑 AUTH (Login/Register)
+================================ */
+export const loginUser = async (email, password) => {
+  try {
+    const response = await api.post('/auth/login', { email, password });
+    return response.data; // token + user
+  } catch (err) {
+    throw new Error(err.response?.data?.message || 'Login failed');
+  }
 };

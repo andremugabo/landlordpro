@@ -45,6 +45,36 @@ export const getAllFloors = async (params = {}) => {
   }
 };
 
+// Get floors by property ID
+export const getFloorsByPropertyId = async (propertyId) => {
+  try {
+    const response = await axiosInstance.get(`/property/${propertyId}`);
+    return response.data;
+  } catch (err) {
+    throw new Error(err?.message || `Failed to fetch floors for property ${propertyId}`);
+  }
+};
+
+// Get floors with statistics (with optional property filter)
+export const getFloorsWithStats = async (params = {}) => {
+  try {
+    const response = await axiosInstance.get('/stats', { params });
+    return response.data;
+  } catch (err) {
+    throw new Error(err?.message || 'Failed to fetch floors with statistics');
+  }
+};
+
+// Get simple floor list for a property
+export const getPropertyFloorsSimple = async (propertyId) => {
+  try {
+    const response = await axiosInstance.get(`/property/${propertyId}/simple`);
+    return response.data;
+  } catch (err) {
+    throw new Error(err?.message || `Failed to fetch simple floors list for property ${propertyId}`);
+  }
+};
+
 // Get single floor
 export const getFloorById = async (id) => {
   try {
@@ -87,10 +117,10 @@ export const deleteFloor = async (id) => {
 
 // ------------------- OCCUPANCY REPORTS -------------------
 
-// Get occupancy report for all floors
-export const getAllFloorsOccupancy = async () => {
+// Get occupancy report for all floors (with optional property filter)
+export const getAllFloorsOccupancy = async (params = {}) => {
   try {
-    const response = await axiosInstance.get('/reports/occupancy');
+    const response = await axiosInstance.get('/reports/occupancy', { params });
     return response.data;
   } catch (err) {
     throw new Error(err?.message || 'Failed to fetch floors occupancy report');
@@ -105,4 +135,21 @@ export const getFloorOccupancy = async (id) => {
   } catch (err) {
     throw new Error(err?.message || `Failed to fetch occupancy report for floor ${id}`);
   }
+};
+
+// ------------------- UTILITY FUNCTIONS -------------------
+
+// Helper to extract floors data from response
+export const extractFloorsData = (response) => {
+  return response?.data || [];
+};
+
+// Helper to check if response is filtered by property
+export const isFilteredByProperty = (response) => {
+  return response?.filtered_by_property || false;
+};
+
+// Helper to get property info from floors response
+export const getPropertyInfo = (response) => {
+  return response?.property || null;
 };

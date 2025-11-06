@@ -8,4 +8,5 @@ export { default as Topbar} from './ui/Topbar'
 export { default as Modal } from './ui/Modal';
 export { default as Select } from './ui/Select';
 export { default as Checkbox } from './ui/Checkbox';
+export { default as Badge } from './ui/Badge';
 export { default as ExpenseForm } from './ExpenseForm';
