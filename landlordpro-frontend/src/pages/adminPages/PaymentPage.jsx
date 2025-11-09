@@ -271,13 +271,13 @@ const PaymentPage = () => {
   return (
     <div className="space-y-6 pt-12 px-3 sm:px-6">
       {/* ✅ Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-500 to-indigo-500 p-4 rounded-lg shadow-md text-white">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4  bg-white p-4 rounded-lg shadow-md text-gray-800">
         <div>
           <h1 className="text-lg sm:text-xl font-semibold">Payments Management</h1>
           <p className="text-sm opacity-90">View, add, edit, or manage payments with date ranges</p>
         </div>
         <Button
-          className="flex items-center gap-2 bg-white text-blue-600 hover:bg-blue-100 px-3 py-2 rounded-md text-sm font-medium shadow-sm transition w-full sm:w-auto justify-center"
+          className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm transition w-full sm:w-auto justify-center"
           onClick={() => {
             setSelectedPayment(null);
             setEditData({ 

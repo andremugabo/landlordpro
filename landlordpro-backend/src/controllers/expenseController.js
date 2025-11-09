@@ -22,10 +22,27 @@ const handleError = (res, err, context = 'Operation') => {
   });
 };
 
+// -------------------- HELPER: NORMALIZE EXPENSE DATA --------------------
+const normalizeExpenseData = (data) => ({
+  ...data,
+  propertyId: data.propertyId || null,
+  localId: data.localId || null,
+  amount: data.amount ? parseFloat(data.amount) : undefined,
+  vatRate: data.vatRate ? parseFloat(data.vatRate) : undefined,
+  vatAmount: data.vatAmount ? parseFloat(data.vatAmount) : undefined,
+  date: data.date ? new Date(data.date) : undefined,
+  dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+  paymentDate: data.paymentDate ? new Date(data.paymentDate) : undefined,
+});
+
 // -------------------- CREATE EXPENSE --------------------
 const createExpense = async (req, res) => {
   try {
-    const expense = await expenseService.createExpense(req.body, req.file);
+    const payload = normalizeExpenseData(req.body);
+    // Default date if not provided
+    if (!payload.date) payload.date = new Date();
+
+    const expense = await expenseService.createExpense(payload, req.file);
 
     res.status(201).json({
       success: true,
@@ -41,12 +58,10 @@ const createExpense = async (req, res) => {
 const updateExpense = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!isUuid(id)) return res.status(400).json({ success: false, message: 'Invalid expense ID' });
 
-    if (!isUuid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid expense ID' });
-    }
-
-    const updatedExpense = await expenseService.updateExpense(id, req.body, req.file);
+    const updates = normalizeExpenseData(req.body);
+    const updatedExpense = await expenseService.updateExpense(id, updates, req.file);
 
     res.status(200).json({
       success: true,
@@ -99,10 +114,7 @@ const getAllExpenses = async (req, res) => {
 const getExpenseById = async (req, res) => {
   try {
     const { id } = req.params;
-
-    if (!isUuid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid expense ID' });
-    }
+    if (!isUuid(id)) return res.status(400).json({ success: false, message: 'Invalid expense ID' });
 
     const expense = await expenseService.getExpenseById(id);
     res.json({ success: true, data: expense });
@@ -115,10 +127,7 @@ const getExpenseById = async (req, res) => {
 const deleteExpense = async (req, res) => {
   try {
     const { id } = req.params;
-
-    if (!isUuid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid expense ID' });
-    }
+    if (!isUuid(id)) return res.status(400).json({ success: false, message: 'Invalid expense ID' });
 
     const result = await expenseService.deleteExpense(id);
     res.json({ success: true, message: result.message });
@@ -131,10 +140,7 @@ const deleteExpense = async (req, res) => {
 const hardDeleteExpense = async (req, res) => {
   try {
     const { id } = req.params;
-
-    if (!isUuid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid expense ID' });
-    }
+    if (!isUuid(id)) return res.status(400).json({ success: false, message: 'Invalid expense ID' });
 
     const result = await expenseService.hardDeleteExpense(id);
     res.json({ success: true, message: result.message });
@@ -147,10 +153,7 @@ const hardDeleteExpense = async (req, res) => {
 const restoreExpense = async (req, res) => {
   try {
     const { id } = req.params;
-
-    if (!isUuid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid expense ID' });
-    }
+    if (!isUuid(id)) return res.status(400).json({ success: false, message: 'Invalid expense ID' });
 
     const expense = await expenseService.restoreExpense(id);
     res.json({ success: true, message: 'Expense restored successfully', data: expense });
@@ -184,19 +187,10 @@ const bulkUpdatePaymentStatus = async (req, res) => {
     const { expenseIds, paymentStatus, paymentDate, paymentMethod } = req.body;
 
     if (!expenseIds || !paymentStatus) {
-      return res.status(400).json({
-        success: false,
-        message: 'expenseIds and paymentStatus are required'
-      });
+      return res.status(400).json({ success: false, message: 'expenseIds and paymentStatus are required' });
     }
 
-    const result = await expenseService.bulkUpdatePaymentStatus(
-      expenseIds,
-      paymentStatus,
-      paymentDate,
-      paymentMethod
-    );
-
+    const result = await expenseService.bulkUpdatePaymentStatus(expenseIds, paymentStatus, paymentDate, paymentMethod);
     res.json({ success: true, message: result.message, updatedCount: result.updatedCount });
   } catch (err) {
     handleError(res, err, 'Bulk update payment status');
@@ -207,17 +201,10 @@ const bulkUpdatePaymentStatus = async (req, res) => {
 const getExpensesByEntity = async (req, res) => {
   try {
     const { entityType, entityId } = req.params;
-
     if (!['property', 'local'].includes(entityType)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid entity type. Must be "property" or "local"'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid entity type. Must be "property" or "local"' });
     }
-
-    if (!isUuid(entityId)) {
-      return res.status(400).json({ success: false, message: 'Invalid entity ID' });
-    }
+    if (!isUuid(entityId)) return res.status(400).json({ success: false, message: 'Invalid entity ID' });
 
     const filters = {
       category: req.query.category,
@@ -238,21 +225,11 @@ const approveExpense = async (req, res) => {
   try {
     const { id } = req.params;
     const { approvedBy } = req.body;
-
-    if (!isUuid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid expense ID' });
-    }
-
-    if (!approvedBy) {
-      return res.status(400).json({ success: false, message: 'approvedBy is required' });
-    }
+    if (!isUuid(id)) return res.status(400).json({ success: false, message: 'Invalid expense ID' });
+    if (!approvedBy) return res.status(400).json({ success: false, message: 'approvedBy is required' });
 
     const expense = await expenseService.approveExpense(id, approvedBy);
-    res.json({
-      success: true,
-      message: 'Expense approved successfully',
-      data: expense
-    });
+    res.json({ success: true, message: 'Expense approved successfully', data: expense });
   } catch (err) {
     handleError(res, err, 'Approve expense');
   }
@@ -265,10 +242,7 @@ const getOverdueExpenses = async (req, res) => {
       propertyId: req.query.propertyId,
       localId: req.query.localId,
     };
-
-    // Optional query param to trigger notifications
     const notify = req.query.notify === 'true';
-
     const expenses = await expenseService.getOverdueExpenses(filters, notify);
     res.json({ success: true, data: expenses, count: expenses.length });
   } catch (err) {
@@ -280,17 +254,11 @@ const getOverdueExpenses = async (req, res) => {
 const getProofFile = async (req, res) => {
   try {
     const { expenseId, filename } = req.params;
-
-    if (!isUuid(expenseId)) {
-      return res.status(400).json({ success: false, message: 'Invalid expense ID' });
-    }
+    if (!isUuid(expenseId)) return res.status(400).json({ success: false, message: 'Invalid expense ID' });
 
     const safeFilename = path.basename(filename);
     const proofPath = path.join(__dirname, '../../uploads/expenses', expenseId, safeFilename);
-
-    if (!fs.existsSync(proofPath)) {
-      return res.status(404).json({ success: false, message: 'Proof file not found' });
-    }
+    if (!fs.existsSync(proofPath)) return res.status(404).json({ success: false, message: 'Proof file not found' });
 
     res.sendFile(proofPath);
   } catch (err) {

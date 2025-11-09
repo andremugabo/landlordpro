@@ -148,7 +148,7 @@ const TenantPage = () => {
           placeholder="Search by name, email, phone, or company..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 w-full border-gray-300 rounded-lg"
+          className="pl-10 w-full border-gray-300 rounded-lg text-white"
         />
       </div>
 

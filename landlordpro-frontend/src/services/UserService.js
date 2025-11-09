@@ -149,3 +149,12 @@ export const loginUser = async (email, password) => {
     throw new Error(err.response?.data?.message || 'Login failed');
   }
 };
+
+/**
+ * Get all active managers (for assigning to properties)
+ */
+export const getAllManagers = async () => {
+  const { users } = await getAllUsers(1, 1000); // fetch all users (adjust limit if needed)
+  // Filter by role 'manager' and active users only
+  return users.filter(user => user.role === 'manager' && user.is_active);
+};

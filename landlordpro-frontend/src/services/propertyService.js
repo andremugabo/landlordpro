@@ -215,3 +215,30 @@ export const debugApiResponse = (response, endpoint) => {
   console.log(`API Response from ${endpoint}:`, response);
   return response;
 };
+
+
+
+
+
+// ================= Assign Manager to Property ================= //
+export const assignManagerToProperty = async (propertyId, managerId, refreshCallback) => {
+  if (!propertyId || !managerId) {
+    showError('Property ID and Manager ID are required.');
+    return null;
+  }
+
+  try {
+    const { data } = await axiosInstance.patch(`/${propertyId}/assign-manager`, { manager_id: managerId });
+    showSuccess(data.message || 'Manager assigned to property successfully.');
+    
+    if (refreshCallback && typeof refreshCallback === 'function') {
+      refreshCallback();
+    }
+
+    return data.data || null;
+  } catch (err) {
+    console.error('assignManagerToProperty error:', err);
+    showError(err.message || 'Failed to assign manager.');
+    throw err;
+  }
+};

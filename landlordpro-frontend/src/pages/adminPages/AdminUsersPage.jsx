@@ -179,7 +179,7 @@ const AdminUsersPage = () => {
           placeholder="Search users by name, email, or role..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 w-full border-gray-300 rounded-lg"
+          className="pl-10 w-full border-gray-300 rounded-lg text-white"
         />
       </div>
 

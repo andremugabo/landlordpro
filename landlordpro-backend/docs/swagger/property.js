@@ -47,26 +47,6 @@
  *     responses:
  *       201:
  *         description: Property created successfully with floors
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Property created successfully with floors."
- *                 data:
- *                   type: object
- *                   properties:
- *                     property:
- *                       $ref: '#/components/schemas/Property'
- *                     floors:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/Floor'
  *       400:
  *         description: Bad request (validation error)
  *       401:
@@ -85,43 +65,14 @@
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Page number
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 10
- *         description: Number of properties per page
  *     responses:
  *       200:
  *         description: Paginated list of properties
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     total:
- *                       type: integer
- *                       example: 50
- *                     page:
- *                       type: integer
- *                       example: 1
- *                     limit:
- *                       type: integer
- *                       example: 10
- *                     totalPages:
- *                       type: integer
- *                       example: 5
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Property'
  *       401:
  *         description: Unauthorized
  */
@@ -141,20 +92,9 @@
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Property ID
  *     responses:
  *       200:
  *         description: Property details including floors
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/Property'
  *       404:
  *         description: Property not found or access denied
  *       401:
@@ -224,6 +164,62 @@
 
 /**
  * @swagger
+ * /api/properties/{id}/assign-manager:
+ *   patch:
+ *     summary: Assign a manager to a property (admin only)
+ *     tags: [Properties]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Property ID to which the manager will be assigned
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - manager_id
+ *             properties:
+ *               manager_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID of the manager to assign
+ *           example:
+ *             manager_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+ *     responses:
+ *       200:
+ *         description: Manager assigned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Manager assigned to property successfully."
+ *                 data:
+ *                   $ref: '#/components/schemas/Property'
+ *       400:
+ *         description: Bad request (missing or invalid manager_id)
+ *       403:
+ *         description: Forbidden (admin only)
+ *       404:
+ *         description: Property not found
+ */
+
+
+/**
+ * @swagger
  * /api/properties/{id}/floors:
  *   get:
  *     summary: Get all floors for a specific property
@@ -237,22 +233,9 @@
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Property ID
  *     responses:
  *       200:
  *         description: List of floors for the property
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Floor'
  *       404:
  *         description: Property not found or access denied
  *       401:
@@ -274,7 +257,6 @@
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Property ID
  *     responses:
  *       200:
  *         description: List of locals for the property

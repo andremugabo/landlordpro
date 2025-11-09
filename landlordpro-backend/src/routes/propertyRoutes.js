@@ -48,7 +48,7 @@ router.get(
 
 // ------------------------------------------------------
 // 🔸 Update a property
-//     → Admin only (can be extended for assigned Manager if needed)
+//     → Admin only
 // ------------------------------------------------------
 router.put('/properties/:id', adminOnly, propertyController.updateProperty);
 
@@ -78,6 +78,16 @@ router.get(
   managerOrAdminOnly,
   verifyPropertyAccess,
   localController.getLocalsByPropertyId
+);
+
+// ------------------------------------------------------
+// 🔸 Assign Manager to Property
+//     → Admin only
+// ------------------------------------------------------
+router.put(
+  '/properties/:propertyId/assign-manager',
+  adminOnly,
+  propertyController.assignManager
 );
 
 module.exports = router;

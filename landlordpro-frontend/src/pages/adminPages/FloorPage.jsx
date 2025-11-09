@@ -208,7 +208,7 @@ const FloorPage = () => {
           }
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 w-full border-gray-300 rounded-lg"
+          className="pl-10 w-full border-gray-300 rounded-lg text-white"
         />
       </div>
 

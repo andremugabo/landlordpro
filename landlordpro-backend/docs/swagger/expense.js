@@ -29,66 +29,66 @@
  *           type: string
  *           format: date
  *           example: "2025-10-06"
- *         vat_rate:
+ *         vatRate:
  *           type: number
  *           example: 18
- *         vat_amount:
+ *         vatAmount:
  *           type: number
  *           example: 27000
  *         proof:
  *           type: string
  *           nullable: true
  *           example: "/uploads/expenses/b123a7b2-9c41-4f31-b8a4-5c8e2e1c9b33/proof.pdf"
- *         property_id:
+ *         propertyId:
  *           type: string
  *           format: uuid
  *           nullable: true
- *         local_id:
+ *         localId:
  *           type: string
  *           format: uuid
  *           nullable: true
- *         payment_status:
+ *         paymentStatus:
  *           type: string
  *           example: "pending"
- *         payment_date:
+ *         paymentDate:
  *           type: string
  *           format: date-time
  *           nullable: true
- *         payment_method:
+ *         paymentMethod:
  *           type: string
  *           nullable: true
- *         due_date:
+ *         dueDate:
  *           type: string
  *           format: date
  *           nullable: true
- *         approved_by:
+ *         approvedBy:
  *           type: string
  *           format: uuid
  *           nullable: true
- *         approval_date:
+ *         approvalDate:
  *           type: string
  *           format: date-time
  *           nullable: true
- *         created_by:
+ *         createdBy:
  *           type: string
  *           format: uuid
  *           nullable: true
  *         notes:
  *           type: string
  *           nullable: true
- *         reference_number:
+ *         referenceNumber:
  *           type: string
  *           nullable: true
- *         vendor_name:
+ *         vendorName:
  *           type: string
  *           nullable: true
- *         vendor_contact:
+ *         vendorContact:
  *           type: string
  *           nullable: true
- *         created_at:
+ *         createdAt:
  *           type: string
  *           format: date-time
- *         updated_at:
+ *         updatedAt:
  *           type: string
  *           format: date-time
  */
@@ -106,73 +106,60 @@
  *         name: category
  *         schema:
  *           type: string
- *         description: Filter by category
  *       - in: query
  *         name: propertyId
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Filter by property ID
  *       - in: query
  *         name: localId
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Filter by local ID
  *       - in: query
  *         name: paymentStatus
  *         schema:
  *           type: string
- *         description: Filter by payment status (paid, pending, overdue)
  *       - in: query
  *         name: currency
  *         schema:
  *           type: string
- *         description: Filter by currency
  *       - in: query
  *         name: startDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Filter expenses from this date
  *       - in: query
  *         name: endDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Filter expenses up to this date
  *       - in: query
  *         name: minAmount
  *         schema:
  *           type: number
- *         description: Minimum expense amount
  *       - in: query
  *         name: maxAmount
  *         schema:
  *           type: number
- *         description: Maximum expense amount
  *       - in: query
  *         name: search
  *         schema:
  *           type: string
- *         description: Search by description, vendor name, or reference number
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           example: 50
- *         description: Limit number of results
  *       - in: query
  *         name: offset
  *         schema:
  *           type: integer
  *           example: 0
- *         description: Offset for pagination
  *       - in: query
  *         name: includeDeleted
  *         schema:
  *           type: boolean
- *         description: Include soft-deleted expenses
  *     responses:
  *       200:
  *         description: List of expenses with pagination
@@ -183,7 +170,6 @@
  *               properties:
  *                 success:
  *                   type: boolean
- *                   example: true
  *                 data:
  *                   type: array
  *                   items:
@@ -193,19 +179,14 @@
  *                   properties:
  *                     total:
  *                       type: integer
- *                       example: 100
  *                     limit:
  *                       type: integer
- *                       example: 50
  *                     offset:
  *                       type: integer
- *                       example: 0
  *                     pages:
  *                       type: integer
- *                       example: 2
  *                     currentPage:
  *                       type: integer
- *                       example: 1
  */
 
 /**
@@ -223,7 +204,6 @@
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Expense ID
  *     responses:
  *       200:
  *         description: Expense details
@@ -267,9 +247,9 @@
  *               date:
  *                 type: string
  *                 format: date
- *               vat_rate:
+ *               vatRate:
  *                 type: number
- *               vat_amount:
+ *               vatAmount:
  *                 type: number
  *               propertyId:
  *                 type: string
@@ -302,7 +282,6 @@
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Expense ID
  *     requestBody:
  *       required: true
  *       content:
@@ -319,9 +298,9 @@
  *               date:
  *                 type: string
  *                 format: date
- *               vat_rate:
+ *               vatRate:
  *                 type: number
- *               vat_amount:
+ *               vatAmount:
  *                 type: number
  *               propertyId:
  *                 type: string
@@ -456,94 +435,6 @@
  *         description: Forbidden
  *       404:
  *         description: Expense not found
- */
-
-/**
- * @swagger
- * /api/expenses/overdue:
- *   get:
- *     summary: Get all overdue expenses
- *     tags: [Expenses]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: propertyId
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: query
- *         name: localId
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: List of overdue expenses
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Expense'
- *                 count:
- *                   type: integer
- */
-
-/**
- * @swagger
- * /api/expenses/summary:
- *   get:
- *     summary: Get expense summary/statistics
- *     tags: [Expenses]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: category
- *         schema:
- *           type: string
- *       - in: query
- *         name: propertyId
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: query
- *         name: localId
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: query
- *         name: currency
- *         schema:
- *           type: string
- *       - in: query
- *         name: startDate
- *         schema:
- *           type: string
- *           format: date
- *       - in: query
- *         name: endDate
- *         schema:
- *           type: string
- *           format: date
- *     responses:
- *       200:
- *         description: Expense summary with totals, counts, and breakdowns
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
  */
 
 /**

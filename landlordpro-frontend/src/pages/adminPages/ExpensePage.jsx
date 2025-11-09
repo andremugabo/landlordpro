@@ -1,590 +1,1219 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  getAllExpenses,
-  createExpense,
-  updateExpense,
-  deleteExpense,
+import React, { useEffect, useState, useMemo } from 'react';
+import { 
+  getAllExpenses, 
+  createExpense, 
+  updateExpense, 
+  deleteExpense, 
+  restoreExpense,
+  approveExpense,
+  bulkUpdatePaymentStatus,
+  getExpenseSummary,
+  downloadProof,
+  calculateVAT
 } from '../../services/expenseService';
 import { getAllProperties } from '../../services/propertyService';
 import { getAllLocals } from '../../services/localService';
-import {
-  Button,
-  Input,
-  Modal,
-  Card,
-  Select,
-  ExpenseForm,
-} from '../../components';
-import {
-  FiTrash,
-  FiPlus,
-  FiEdit,
-  FiChevronLeft,
-  FiChevronRight,
-  FiPaperclip,
-  FiChevronsLeft,
-  FiChevronsRight,
+import { Button, Modal, Input, Card, Select, Badge } from '../../components';
+import { 
+  FiEdit, FiPlus, FiTrash, FiSearch, FiRefreshCcw, 
+  FiDollarSign, FiCalendar, FiFileText, FiDownload,
+  FiCheckCircle, FiAlertCircle, FiFilter, FiX,FiChevronLeft, FiChevronRight, FiChevronsLeft, FiChevronsRight
 } from 'react-icons/fi';
 import { showSuccess, showError, showInfo } from '../../utils/toastHelper';
-import debounce from 'lodash.debounce';
 
 const ExpensePage = () => {
+  // State management
   const [expenses, setExpenses] = useState([]);
   const [properties, setProperties] = useState([]);
   const [locals, setLocals] = useState([]);
-  const [editData, setEditData] = useState({});
+  const [summary, setSummary] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [submitLoading, setSubmitLoading] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState(null);
+  const [selectedExpenses, setSelectedExpenses] = useState([]);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  
+  // Form data
+  const [formData, setFormData] = useState({
+    description: '',
+    amount: '',
+    vatRate: '',
+    vatAmount: '',
+    category: '',
+    paymentStatus: 'pending',
+    paymentDate: '',
+    paymentMethod: '',
+    dueDate: '',
+    propertyId: '',
+    localId: '',
+    currency: 'RWF',
+    vendor: '',
+    invoiceNumber: '',
+    proofFile: null,
+  });
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterProperty, setFilterProperty] = useState('');
-  const [filterLocal, setFilterLocal] = useState('');
+  const [filters, setFilters] = useState({
+    search: '',
+    category: '',
+    paymentStatus: '',
+    propertyId: '',
+    localId: '',
+    currency: '',
+    startDate: '',
+    endDate: '',
+    minAmount: '',
+    maxAmount: '',
+  });
 
-  // Pagination
+  // UI state
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [limit] = useState(10);
 
-  // Fetch Expenses
-  const fetchExpenses = useCallback(
-    async (search = '') => {
-      setLoading(true);
-      try {
-        const res = await getAllExpenses({
-          page,
-          limit,
-          propertyId: filterProperty,
-          localId: filterLocal,
-          search,
-        });
+  // Constants
+  const categoryOptions = [
+    { value: 'maintenance', label: 'Maintenance', color: 'yellow' },
+    { value: 'utilities', label: 'Utilities', color: 'blue' },
+    { value: 'insurance', label: 'Insurance', color: 'purple' },
+    { value: 'taxes', label: 'Taxes', color: 'red' },
+    { value: 'repairs', label: 'Repairs', color: 'orange' },
+    { value: 'cleaning', label: 'Cleaning', color: 'green' },
+    { value: 'security', label: 'Security', color: 'indigo' },
+    { value: 'other', label: 'Other', color: 'gray' },
+  ];
 
-        setExpenses(Array.isArray(res.data) ? res.data : []);
-        setTotalPages(res.pagination?.pages || 1);
-        setTotalExpenses(res.pagination?.total || 0);
-      } catch (err) {
-        showError(err?.message || 'Failed to load expenses');
-        setExpenses([]);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [page, limit, filterProperty, filterLocal]
-  );
+  const paymentStatusOptions = [
+    { value: 'pending', label: 'Pending', color: 'yellow' },
+    { value: 'paid', label: 'Paid', color: 'green' },
+    { value: 'overdue', label: 'Overdue', color: 'red' },
+    { value: 'cancelled', label: 'Cancelled', color: 'gray' },
+  ];
 
-  // Fetch Properties
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        const { properties: props } = await getAllProperties();
-        setProperties(Array.isArray(props) ? props : []);
-      } catch (err) {
-        showError(err?.message || 'Failed to load properties');
-      }
-    };
-    fetchInitialData();
-  }, []);
+  const currencyOptions = [
+    { value: 'RWF', label: 'RWF' },
+    { value: 'USD', label: 'USD' },
+    { value: 'EUR', label: 'EUR' },
+  ];
 
-  // Fetch Locals when property filter changes
-  useEffect(() => {
-    const fetchLocals = async () => {
-      if (!filterProperty) {
-        setLocals([]);
-        return;
-      }
-      try {
-        const { locals: locs } = await getAllLocals(filterProperty);
-        setLocals(Array.isArray(locs) ? locs : []);
-      } catch (err) {
-        showError(err?.message || 'Failed to load locals');
-        setLocals([]);
-      }
-    };
-    fetchLocals();
-  }, [filterProperty]);
+  const paymentMethodOptions = [
+    { value: 'bank_transfer', label: 'Bank Transfer' },
+    { value: 'cash', label: 'Cash' },
+    { value: 'mobile_money', label: 'Mobile Money' },
+    { value: 'check', label: 'Check' },
+    { value: 'credit_card', label: 'Credit Card' },
+  ];
 
-  // Fetch expenses on page/filter change
-  useEffect(() => {
-    fetchExpenses(searchTerm);
-  }, [page, limit, filterProperty, filterLocal, fetchExpenses]);
-
-  // Debounced search
-  const debouncedSearch = useMemo(
-    () =>
-      debounce((val) => {
-        setPage(1);
-        fetchExpenses(val);
-      }, 300),
-    [fetchExpenses]
-  );
-
-  useEffect(() => {
-    if (searchTerm) {
-      debouncedSearch(searchTerm);
-    }
-    return () => debouncedSearch.cancel();
-  }, [searchTerm, debouncedSearch]);
-
-  // Summary
-  const summary = useMemo(() => {
-    const total = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-    return { total, count: expenses.length };
-  }, [expenses]);
-
-  // Add/Edit Expense
-  const handleSubmit = async (file) => {
-    const { amount, category, propertyId, description } = editData;
-    if (!amount || !category || !propertyId || !description)
-      return showError('Amount, category, description, and property are required.');
-
-    setSubmitLoading(true);
+  // Fetch data
+  const fetchExpenses = async (pageNumber = page) => {
     try {
-      const formData = new FormData();
-      Object.entries(editData).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          formData.append(key, value);
-        }
-      });
-      if (file) formData.append('proof', file);
-
-      if (editData.id) {
-        await updateExpense(editData.id, formData, true);
-        showSuccess('Expense updated successfully!');
-      } else {
-        await createExpense(formData, true);
-        showSuccess('Expense created successfully!');
-      }
-
-      setModalOpen(false);
-      setEditData({});
-      fetchExpenses(searchTerm);
+      setLoading(true);
+      const controller = new AbortController();
+      
+      const result = await getAllExpenses({
+        page: pageNumber,
+        limit,
+        ...filters,
+      }, controller.signal);
+      
+      setExpenses(result.data || []);
+      setTotalPages(result.pagination?.totalPages || 1);
+      setPage(result.pagination?.page || pageNumber);
     } catch (err) {
-      showError(err?.message || 'Failed to save expense');
+      if (err.name !== 'AbortError') {
+        console.error('Error fetching expenses:', err);
+        showError(err?.message || 'Failed to fetch expenses');
+        setExpenses([]);
+      }
     } finally {
-      setSubmitLoading(false);
+      setLoading(false);
     }
   };
 
-  // Delete
+  const fetchSummary = async () => {
+    try {
+      const data = await getExpenseSummary(filters);
+      console.log(data)
+      setSummary(data);
+    } catch (err) {
+      console.error('Error fetching summary:', err);
+    }
+  };
+
+  const fetchProperties = async () => {
+    try {
+      const data = await getAllProperties(1, 100);
+      setProperties(data.properties || []);
+    } catch (err) {
+      console.error('Error fetching properties:', err);
+      setProperties([]);
+    }
+  };
+
+  const fetchLocals = async () => {
+    try {
+      const data = await getAllLocals({ page: 1, limit: 1000 });
+      setLocals(data.data || data.locals || []);
+    } catch (err) {
+      console.error('Error fetching locals:', err);
+      setLocals([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchExpenses();
+    fetchSummary();
+    fetchProperties();
+    fetchLocals();
+  }, []);
+
+  useEffect(() => {
+    if (Object.values(filters).some(v => v)) {
+      fetchExpenses(1);
+      fetchSummary();
+    }
+  }, [filters]);
+
+  // VAT calculation handler
+  const handleAmountChange = (value) => {
+    const amount = parseFloat(value) || 0;
+    setFormData(prev => {
+      const vatRate = parseFloat(prev.vatRate) || 0;
+      const vatAmount = vatRate > 0 ? calculateVAT(amount, vatRate) : 0;
+      return {
+        ...prev,
+        amount: value,
+        vatAmount: vatAmount.toFixed(2),
+      };
+    });
+  };
+
+  const handleVatRateChange = (value) => {
+    const vatRate = parseFloat(value) || 0;
+    setFormData(prev => {
+      const amount = parseFloat(prev.amount) || 0;
+      const vatAmount = amount > 0 && vatRate > 0 ? calculateVAT(amount, vatRate) : 0;
+      return {
+        ...prev,
+        vatRate: value,
+        vatAmount: vatAmount.toFixed(2),
+      };
+    });
+  };
+
+  // Modal handlers
+  const handleEditClick = (expense) => {
+    setSelectedExpense(expense);
+    setFormData({
+      description: expense.description || '',
+      amount: expense.amount || '',
+      vatRate: expense.vat_rate || '',
+      vatAmount: expense.vat_amount || '',
+      category: expense.category || '',
+      paymentStatus: expense.payment_status || 'pending',
+      paymentDate: expense.payment_date?.split('T')[0] || '',
+      paymentMethod: expense.payment_method || '',
+      dueDate: expense.due_date?.split('T')[0] || '',
+      propertyId: expense.property_id || '',
+      localId: expense.local_id || '',
+      currency: expense.currency || 'RWF',
+      vendor: expense.vendor || '',
+      invoiceNumber: expense.invoice_number || '',
+      proofFile: null,
+    });
+    setModalOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    if (submitting) return;
+  
+    // Validation
+    if (!formData.description?.trim()) return showError('Description is required');
+    if (!formData.amount || parseFloat(formData.amount) <= 0) return showError('Valid amount is required');
+    if (!formData.category) return showError('Category is required');
+    if (!formData.propertyId) return showError('Property is required');
+  
+    setSubmitting(true);
+    setUploadProgress(0);
+  
+    try {
+      // 1️⃣ Construct FormData
+      const formDataToSend = new FormData();
+      formDataToSend.append('description', formData.description.trim());
+      formDataToSend.append('amount', parseFloat(formData.amount));
+      formDataToSend.append('vatRate', parseFloat(formData.vatRate) || 0);
+      formDataToSend.append('vatAmount', parseFloat(formData.vatAmount) || 0);
+      formDataToSend.append('category', formData.category);
+      formDataToSend.append('paymentStatus', formData.paymentStatus);
+      formDataToSend.append('paymentDate', formData.paymentDate || '');
+      formDataToSend.append('paymentMethod', formData.paymentMethod || '');
+      formDataToSend.append('dueDate', formData.dueDate || '');
+      formDataToSend.append('propertyId', formData.propertyId);
+      formDataToSend.append('localId', formData.localId || '');
+      formDataToSend.append('currency', formData.currency);
+      formDataToSend.append('vendor', formData.vendor?.trim() || '');
+      formDataToSend.append('invoiceNumber', formData.invoiceNumber?.trim() || '');
+  
+      if (formData.proofFile) {
+        formDataToSend.append('proof', formData.proofFile); // Make sure backend expects 'proof'
+      }
+  
+      // 2️⃣ Send via service
+      if (selectedExpense) {
+        await updateExpense(selectedExpense.id, formDataToSend, (progress) => setUploadProgress(progress));
+        showSuccess('Expense updated successfully!');
+      } else {
+        await createExpense(formDataToSend, (progress) => setUploadProgress(progress));
+        showSuccess('Expense created successfully!');
+        setPage(1);
+      }
+  
+      // 3️⃣ Refresh data
+      await fetchExpenses(selectedExpense ? page : 1);
+      await fetchSummary();
+      handleModalClose();
+  
+    } catch (err) {
+      console.error('Error saving expense:', err);
+      showError(err?.message || 'Failed to save expense');
+    } finally {
+      setSubmitting(false);
+      setUploadProgress(0);
+    }
+  };
+  
+
   const handleDelete = async (expense) => {
-    if (!window.confirm('Are you sure you want to delete this expense?')) return;
+    if (!window.confirm(`Delete expense "${expense.description}"?`)) return;
+    
     try {
       await deleteExpense(expense.id);
-      showInfo('Expense deleted successfully.');
-      if (expenses.length === 1 && page > 1) setPage(page - 1);
-      else fetchExpenses(searchTerm);
+      showInfo('Expense deleted successfully');
+      await fetchExpenses(page);
+      await fetchSummary();
     } catch (err) {
+      console.error('Error deleting expense:', err);
       showError(err?.message || 'Failed to delete expense');
     }
   };
 
-  // Options
-  const propertyOptions = [
-    { value: '', label: '— All Properties —' },
-    ...properties.map((p) => ({ value: p.id, label: p.name })),
-  ];
-
-  const localOptions = [
-    { value: '', label: '— All Locals —' },
-    ...locals.map((l) => ({ value: l.id, label: l.reference_code })),
-  ];
-
-  const handleResetFilters = () => {
-    setSearchTerm('');
-    setFilterProperty('');
-    setFilterLocal('');
-    setPage(1);
+  const handleRestore = async (expense) => {
+    try {
+      await restoreExpense(expense.id);
+      showSuccess('Expense restored successfully');
+      await fetchExpenses(page);
+      await fetchSummary();
+    } catch (err) {
+      console.error('Error restoring expense:', err);
+      showError(err?.message || 'Failed to restore expense');
+    }
   };
 
-  const getStatusBadge = (status) => {
-    const statusLower = (status || 'pending').toLowerCase();
-    const map = {
-      paid: 'bg-green-100 text-green-700 border border-green-200',
-      pending: 'bg-yellow-100 text-yellow-700 border border-yellow-200',
-      overdue: 'bg-red-100 text-red-700 border border-red-200',
-      cancelled: 'bg-gray-100 text-gray-700 border border-gray-200',
-    };
-    return map[statusLower] || map.pending;
+  const handleApprove = async (expense) => {
+    try {
+      await approveExpense(expense.id, 'current_user_id'); // Replace with actual user ID
+      showSuccess('Expense approved successfully');
+      await fetchExpenses(page);
+    } catch (err) {
+      console.error('Error approving expense:', err);
+      showError(err?.message || 'Failed to approve expense');
+    }
   };
 
-  // Generate page numbers for pagination
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxPages = 7; // Show max 7 page numbers
-
-    if (totalPages <= maxPages) {
-      // Show all pages if total is less than max
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Always show first page
-      pages.push(1);
-
-      if (page > 3) {
-        pages.push('...');
-      }
-
-      // Show pages around current page
-      const start = Math.max(2, page - 1);
-      const end = Math.min(totalPages - 1, page + 1);
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-
-      if (page < totalPages - 2) {
-        pages.push('...');
-      }
-
-      // Always show last page
-      pages.push(totalPages);
+  const handleBulkUpdate = async (status, date, method) => {
+    if (selectedExpenses.length === 0) {
+      return showError('No expenses selected');
     }
 
-    return pages;
+    try {
+      await bulkUpdatePaymentStatus({
+        expenseIds: selectedExpenses,
+        paymentStatus: status,
+        paymentDate: date,
+        paymentMethod: method,
+      });
+      showSuccess(`${selectedExpenses.length} expense(s) updated`);
+      setSelectedExpenses([]);
+      setBulkModalOpen(false);
+      await fetchExpenses(page);
+      await fetchSummary();
+    } catch (err) {
+      console.error('Error bulk updating:', err);
+      showError(err?.message || 'Failed to update expenses');
+    }
   };
 
-  const pageNumbers = getPageNumbers();
+  const handleDownloadProof = async (expense) => {
+    if (!expense.proof_file_name) {
+      return showError('No proof file available');
+    }
+
+    try {
+      await downloadProof(expense.id, expense.proof_file_name);
+      showSuccess('File downloaded successfully');
+    } catch (err) {
+      console.error('Error downloading proof:', err);
+      showError(err?.message || 'Failed to download file');
+    }
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setSelectedExpense(null);
+    setFormData({
+      description: '',
+      amount: '',
+      vatRate: '',
+      vatAmount: '',
+      category: '',
+      paymentStatus: 'pending',
+      paymentDate: '',
+      paymentMethod: '',
+      dueDate: '',
+      propertyId: '',
+      localId: '',
+      currency: 'RWF',
+      vendor: '',
+      invoiceNumber: '',
+      proofFile: null,
+    });
+    setUploadProgress(0);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        showError('File size must be less than 5MB');
+        e.target.value = '';
+        return;
+      }
+      setFormData(prev => ({ ...prev, proofFile: file }));
+    }
+  };
+
+  // Bulk selection
+  const toggleExpenseSelection = (expenseId) => {
+    setSelectedExpenses(prev =>
+      prev.includes(expenseId)
+        ? prev.filter(id => id !== expenseId)
+        : [...prev, expenseId]
+    );
+  };
+
+  const toggleAllSelection = () => {
+    if (selectedExpenses.length === expenses.length) {
+      setSelectedExpenses([]);
+    } else {
+      setSelectedExpenses(expenses.map(e => e.id));
+    }
+  };
+
+  // Computed values
+  const propertyOptions = useMemo(() => 
+    properties.map(p => ({ value: p.id, label: p.name })),
+    [properties]
+  );
+
+  const localOptions = useMemo(() => {
+    if (!formData.propertyId) return [];
+    return locals
+      .filter(l => l.property_id === formData.propertyId)
+      .map(l => ({ value: l.id, label: l.reference_code }));
+  }, [locals, formData.propertyId]);
+
+  const getPropertyName = (propertyId) => {
+    return properties.find(p => p.id === propertyId)?.name || '-';
+  };
+
+  const getLocalName = (localId) => {
+    return locals.find(l => l.id === localId)?.reference_code || '-';
+  };
+
+  // Format currency
+  const formatCurrency = (amount, currency = 'RWF') => {
+    return new Intl.NumberFormat('en-RW', {
+      style: 'currency',
+      currency: currency,
+    }).format(amount);
+  };
+
+  // Status badge component
+  const StatusBadge = ({ status, deleted }) => {
+    if (deleted) {
+      return <Badge className="bg-red-100 text-red-800" text="Deleted" />;
+    }
+
+    const statusOption = paymentStatusOptions.find(opt => opt.value === status);
+    const colorClass = `bg-${statusOption?.color || 'gray'}-100 text-${statusOption?.color || 'gray'}-800`;
+    
+    return <Badge className={colorClass} text={statusOption?.label || status} />;
+  };
+
+  const CategoryBadge = ({ category }) => {
+    const categoryOption = categoryOptions.find(opt => opt.value === category);
+    const colorClass = `bg-${categoryOption?.color || 'gray'}-100 text-${categoryOption?.color || 'gray'}-800`;
+    
+    return <Badge className={colorClass} text={categoryOption?.label || category} />;
+  };
+
+  // Mobile card
+  const MobileCard = ({ expense }) => (
+    <Card className="p-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <input
+              type="checkbox"
+              checked={selectedExpenses.includes(expense.id)}
+              onChange={() => toggleExpenseSelection(expense.id)}
+              className="rounded border-gray-300"
+            />
+            <h3 className="font-semibold text-gray-800 text-sm">
+              {expense.description}
+            </h3>
+          </div>
+          <p className="text-xs text-gray-500">{getPropertyName(expense.property_id)}</p>
+        </div>
+        <StatusBadge status={expense.payment_status} deleted={!!expense.deleted_at} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+        <div>
+          <span className="text-gray-500 text-xs">Amount:</span>
+          <div className="font-bold text-gray-800">
+            {formatCurrency(expense.amount, expense.currency)}
+          </div>
+        </div>
+        <div>
+          <span className="text-gray-500 text-xs">Category:</span>
+          <div><CategoryBadge category={expense.category} /></div>
+        </div>
+        <div>
+          <span className="text-gray-500 text-xs">Due Date:</span>
+          <div className="text-gray-700">
+            {expense.due_date ? new Date(expense.due_date).toLocaleDateString() : '-'}
+          </div>
+        </div>
+        <div>
+          <span className="text-gray-500 text-xs">Vendor:</span>
+          <div className="text-gray-700">{expense.vendor || '-'}</div>
+        </div>
+      </div>
+
+      {!expense.deleted_at && (
+        <div className="flex gap-2 pt-3 border-t">
+          <Button 
+            className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-xs"
+            onClick={() => handleEditClick(expense)}
+          >
+            <FiEdit className="inline mr-1" /> Edit
+          </Button>
+          {expense.proof_file_name && (
+            <Button 
+              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-xs"
+              onClick={() => handleDownloadProof(expense)}
+            >
+              <FiDownload className="inline mr-1" /> Proof
+            </Button>
+          )}
+          <Button 
+            className="flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-xs"
+            onClick={() => handleDelete(expense)}
+          >
+            <FiTrash className="inline mr-1" /> Delete
+          </Button>
+        </div>
+      )}
+
+      {expense.deleted_at && (
+        <Button 
+          className="w-full bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded text-xs"
+          onClick={() => handleRestore(expense)}
+        >
+          <FiRefreshCcw className="inline mr-1" /> Restore
+        </Button>
+      )}
+    </Card>
+  );
 
   return (
     <div className="space-y-6 pt-12 px-3 sm:px-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-green-500 to-teal-500 p-6 rounded-xl shadow-lg text-white">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Expenses</h1>
-          <p className="text-sm opacity-90 mt-1">
-            {totalExpenses} expense{totalExpenses !== 1 ? 's' : ''}{' '}
-            {summary.count > 0 &&
-              ` • Total: FRW ${summary.total.toLocaleString()}`}
-          </p>
-        </div>
-        <Button
-          className="flex items-center gap-2 bg-white text-green-600 hover:bg-green-50 px-4 py-2.5 rounded-lg text-sm font-semibold shadow-md transition w-full sm:w-auto justify-center"
-          onClick={() => {
-            if (properties.length === 0) {
-              return showError('Please wait for properties to load.');
-            }
-            setEditData({});
-            setModalOpen(true);
-          }}
-        >
-          <FiPlus className="w-5 h-5" /> Add Expense
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white p-5 rounded-xl shadow-md border border-gray-200 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="text-sm font-semibold text-gray-700 block mb-2">
-              Search
-            </label>
-            <Input
-              placeholder="Search by category or description..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full"
-            />
+      <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-lg shadow-sm border">
+          {/* Left: Title */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-800 truncate">
+              Expense Management
+            </h1>
+            <p className="text-sm text-gray-500 truncate">
+              Track and manage property expenses
+            </p>
           </div>
 
-          <div>
-            <label className="text-sm font-semibold text-gray-700 block mb-2">
-              Property
-            </label>
-            <Select
-              value={propertyOptions.find((o) => o.value === filterProperty) || propertyOptions[0]}
-              options={propertyOptions}
-              onChange={(opt) => {
-                setFilterProperty(opt?.value || '');
-                setFilterLocal('');
-                setPage(1);
-              }}
-              isSearchable
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-gray-700 block mb-2">
-              Local
-            </label>
-            <Select
-              value={localOptions.find((o) => o.value === filterLocal) || localOptions[0]}
-              options={localOptions}
-              onChange={(opt) => {
-                setFilterLocal(opt?.value || '');
-                setPage(1);
-              }}
-              isDisabled={!filterProperty}
-              isSearchable
-            />
-          </div>
-
-          <div className="flex items-end">
+          {/* Right: Buttons */}
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start sm:justify-end">
             <Button
-              onClick={handleResetFilters}
-              className="w-full bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2.5 rounded-lg text-sm font-medium transition"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm min-w-[120px]"
+              onClick={() => setFilterModalOpen(true)}
             >
-              Reset Filters
+              <FiFilter /> Filters
+            </Button>
+            <Button
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm min-w-[120px]"
+              onClick={() => setModalOpen(true)}
+            >
+              <FiPlus /> Add Expense
             </Button>
           </div>
         </div>
+
+
+      {/* Summary Cards */}
+      {summary && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <Card className="p-3 sm:p-4 bg-white rounded-lg shadow-sm border">
+              <div className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 truncate">
+                {formatCurrency(summary.total || 0)}
+              </div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">Total Expenses</div>
+            </Card>
+            
+            <Card className="p-3 sm:p-4 bg-white rounded-lg shadow-sm border">
+              <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate">
+                {formatCurrency(summary.paid || 0)}
+              </div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">Paid</div>
+            </Card>
+            
+            <Card className="p-3 sm:p-4 bg-white rounded-lg shadow-sm border">
+              <div className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 truncate">
+                {formatCurrency(summary.pending || 0)}
+              </div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">Pending</div>
+            </Card>
+            
+            <Card className="p-3 sm:p-4 bg-white rounded-lg shadow-sm border">
+              <div className="text-lg sm:text-xl md:text-2xl font-bold text-red-600 truncate">
+                {formatCurrency(summary.overdue || 0)}
+              </div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">Overdue</div>
+            </Card>
+            
+            <Card className="p-3 sm:p-4 bg-white rounded-lg shadow-sm border">
+              <div className="text-lg sm:text-xl md:text-2xl font-bold text-red-600 truncate">
+                {formatCurrency(summary.totalWithVat || 0)}
+              </div>
+              <div className="text-xs sm:text-sm text-gray-500 mt-1">Total With VAT</div>
+            </Card>
+          </div>
+        )}
+
+      {/* Bulk Actions */}
+      {selectedExpenses.length > 0 && (
+        <Card className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <span className="text-sm text-blue-800 font-medium">
+              {selectedExpenses.length} expense(s) selected
+            </span>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                className="flex-1 sm:flex-none bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded text-xs"
+                onClick={() => setBulkModalOpen(true)}
+              >
+                Update Status
+              </Button>
+              <Button
+                className="flex-1 sm:flex-none bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded text-xs"
+                onClick={() => setSelectedExpenses([])}
+              >
+                Clear Selection
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Desktop Table */}
+      <div className="hidden md:block">
+        <Card className="bg-white rounded-xl shadow-md border overflow-x-auto">
+          {loading ? (
+            <div className="p-8 text-center text-gray-500">Loading expenses...</div>
+          ) : expenses.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">No expenses found</div>
+          ) : (
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 border-b text-xs uppercase text-gray-600">
+                <tr>
+                  <th className="p-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedExpenses.length === expenses.length}
+                      onChange={toggleAllSelection}
+                      className="rounded"
+                    />
+                  </th>
+                  <th className="p-3 text-left">Description</th>
+                  <th className="p-3 text-left">Property</th>
+                  <th className="p-3 text-left">Category</th>
+                  <th className="p-3 text-right">Amount</th>
+                  <th className="p-3 text-left">Status</th>
+                  <th className="p-3 text-left">Due Date</th>
+                  <th className="p-3 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expenses.map(expense => (
+                  <tr key={expense.id} className="hover:bg-gray-50 border-b">
+                    <td className="p-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedExpenses.includes(expense.id)}
+                        onChange={() => toggleExpenseSelection(expense.id)}
+                        className="rounded"
+                      />
+                    </td>
+                    <td className="p-3 font-medium text-gray-800">
+                      <div>{expense.description}</div>
+                      {expense.vendor && (
+                        <div className="text-xs text-gray-500">Vendor: {expense.vendor}</div>
+                      )}
+                    </td>
+                    <td className="p-3">{getPropertyName(expense.property_id)}</td>
+                    <td className="p-3"><CategoryBadge category={expense.category} /></td>
+                    <td className="p-3 text-right font-semibold">
+                      {formatCurrency(expense.amount, expense.currency)}
+                      {expense.vat_amount > 0 && (
+                        <div className="text-xs text-gray-500">
+                          VAT: {formatCurrency(expense.vat_amount, expense.currency)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <StatusBadge status={expense.payment_status} deleted={!!expense.deleted_at} />
+                    </td>
+                    <td className="p-3">
+                      {expense.due_date ? new Date(expense.due_date).toLocaleDateString() : '-'}
+                    </td>
+                    <td className="p-3">
+                      <div className="flex justify-center gap-2">
+                        {!expense.deleted_at ? (
+                          <>
+                            <Button 
+                              className="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs"
+                              onClick={() => handleEditClick(expense)}
+                            >
+                              <FiEdit />
+                            </Button>
+                            {expense.proof_file_name && (
+                              <Button 
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs"
+                                onClick={() => handleDownloadProof(expense)}
+                              >
+                                <FiDownload />
+                              </Button>
+                            )}
+                            <Button 
+                              className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
+                              onClick={() => handleDelete(expense)}
+                            >
+                              <FiTrash />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button 
+                            className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
+                            onClick={() => handleRestore(expense)}
+                          >
+                            <FiRefreshCcw />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
       </div>
 
-      {/* Expense List */}
-      <div className="grid gap-4">
+      {/* Mobile Cards */}
+      <div className="md:hidden space-y-4">
         {loading ? (
-          <div className="p-12 text-center text-gray-500 bg-white rounded-xl shadow-md">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto"></div>
-            <p className="mt-4 font-medium">Loading expenses...</p>
-          </div>
+          <div className="p-8 text-center text-gray-500">Loading expenses...</div>
         ) : expenses.length === 0 ? (
-          <div className="p-12 text-center text-gray-500 bg-white rounded-xl shadow-md">
-            <p className="text-lg font-medium">
-              {searchTerm || filterProperty || filterLocal
-                ? 'No expenses match your filters'
-                : 'No expenses yet. Click "Add Expense" to get started!'}
-            </p>
-          </div>
+          <div className="p-8 text-center text-gray-500">No expenses found</div>
         ) : (
-          expenses.map((e) => {
-            const property = properties.find((p) => p.id === e.propertyId);
-            const local = locals.find((l) => l.id === e.localId);
-
-            return (
-              <Card
-                key={e.id}
-                className="p-5 rounded-xl shadow-md border border-gray-200 bg-white hover:shadow-xl transition-all duration-200"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h2 className="text-lg font-bold text-gray-900">{e.category}</h2>
-                      {e.payment_status && (
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(
-                            e.payment_status
-                          )}`}
-                        >
-                          {e.payment_status.charAt(0).toUpperCase() + e.payment_status.slice(1)}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      {e.description || 'No description'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1 shadow-sm transition"
-                      onClick={() => {
-                        setEditData(e);
-                        setModalOpen(true);
-                      }}
-                    >
-                      <FiEdit className="w-4 h-4" />
-                      <span className="hidden sm:inline">Edit</span>
-                    </Button>
-                    <Button
-                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1 shadow-sm transition"
-                      onClick={() => handleDelete(e)}
-                    >
-                      <FiTrash className="w-4 h-4" />
-                      <span className="hidden sm:inline">Delete</span>
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
-                    <span className="font-medium">
-                      Amount:{' '}
-                      <span className="text-green-600 font-bold">
-                        {e.currency || 'FRW'}{' '}
-                        {parseFloat(e.amount || 0).toLocaleString()}
-                      </span>
-                    </span>
-                    {e.vat_amount > 0 && (
-                      <span>
-                        VAT: <span className="font-semibold">{parseFloat(e.vat_amount).toLocaleString()}</span>
-                        {e.vat_rate && ` (${e.vat_rate}%)`}
-                      </span>
-                    )}
-                    <span className="font-medium">
-                      Total:{' '}
-                      <span className="text-gray-900 font-bold">
-                        {e.currency || 'FRW'}{' '}
-                        {(parseFloat(e.amount || 0) + parseFloat(e.vat_amount || 0)).toLocaleString()}
-                      </span>
-                    </span>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
-                    <span>Property: <span className="font-medium">{property?.name || 'N/A'}</span></span>
-                    {e.local_id && <span>Local: <span className="font-medium">{local?.reference_code || 'N/A'}</span></span>}
-                    <span>Date: <span className="font-medium">{e.date ? new Date(e.date).toLocaleDateString() : 'N/A'}</span></span>
-                    {e.due_date && (
-                      <span>Due: <span className="font-medium">{new Date(e.due_date).toLocaleDateString()}</span></span>
-                    )}
-                  </div>
-
-                  {(e.vendor_name || e.payment_method || e.reference_number) && (
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
-                      {e.vendor_name && <span>Vendor: <span className="font-medium">{e.vendor_name}</span></span>}
-                      {e.payment_method && (
-                        <span>Method: <span className="font-medium">{e.payment_method.replace('_', ' ')}</span></span>
-                      )}
-                      {e.reference_number && <span>Ref: <span className="font-medium">{e.reference_number}</span></span>}
-                    </div>
-                  )}
-                </div>
-
-                {(e.proof || e.notes) && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                    {e.proof && (
-                      <a
-                        href={`${import.meta.env.VITE_API_BASE_URL}/api/expenses/${e.id}/proof/${e.proof}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-2 font-medium hover:underline"
-                      >
-                        <FiPaperclip className="w-4 h-4" /> View Proof Document
-                      </a>
-                    )}
-                    {e.notes && (
-                      <p className="text-sm text-gray-600 italic bg-gray-50 p-2 rounded">
-                        <span className="font-semibold">Note:</span> {e.notes}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
-          })
+          expenses.map(expense => <MobileCard key={expense.id} expense={expense} />)
         )}
       </div>
 
       {/* Pagination */}
-      {!loading && expenses.length > 0 && totalPages > 1 && (
-        <div className="bg-white p-5 rounded-xl shadow-md border border-gray-200">
-          <div className="flex flex-col gap-4">
-            {/* Pagination Info & Items Per Page */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-              <div className="text-sm text-gray-600 font-medium">
-                Showing <span className="font-bold text-gray-900">{((page - 1) * limit) + 1}</span> to{' '}
-                <span className="font-bold text-gray-900">{Math.min(page * limit, totalExpenses)}</span> of{' '}
-                <span className="font-bold text-gray-900">{totalExpenses}</span> expenses
-              </div>
+      {!loading && expenses.length > 0 && (
+          <div className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 px-4 sm:px-6 py-4 bg-white border border-gray-200 rounded-xl shadow-sm">
 
-              {/* Items Per Page Selector */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600 font-medium">Items per page:</label>
-                <select
-                  value={limit}
-                  onChange={(e) => {
-                    setLimit(Number(e.target.value));
-                    setPage(1);
-                  }}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 text-sm font-medium bg-white cursor-pointer"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
+            {/* Page Info */}
+            <div className="flex flex-col gap-1 text-center sm:text-left">
+              <span className="text-sm text-gray-900 font-semibold">
+                Page {page} of {totalPages}
+              </span>
+              <span className="text-xs text-gray-500">
+                Showing {((page - 1) * 10) + 1}-{Math.min(page * 10, totalPages * 10)} results
+              </span>
             </div>
 
-            {/* Pagination Controls */}
-            <div className="flex justify-center items-center gap-2">
-              {/* First Page */}
+            {/* Pagination Bar */}
+            <nav className="flex flex-row justify-center sm:justify-end gap-2 w-full sm:w-auto" aria-label="Pagination">
+
+              {/* First */}
               <Button
+                onClick={() => fetchExpenses(1)}
                 disabled={page <= 1}
-                onClick={() => setPage(1)}
-                className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition"
-                title="First Page"
+                aria-label="Go to first page"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-red-500 text-white hover:bg-red-600 disabled:bg-red-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors shadow-sm"
               >
                 <FiChevronsLeft className="w-4 h-4" />
+                <span className="hidden md:inline">First</span>
               </Button>
 
-              {/* Previous Page */}
+              {/* Prev */}
               <Button
+                onClick={() => fetchExpenses(page - 1)}
                 disabled={page <= 1}
-                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition"
+                aria-label="Go to previous page"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-yellow-500 text-white hover:bg-yellow-600 disabled:bg-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors shadow-sm"
               >
                 <FiChevronLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Prev</span>
+                <span className="hidden md:inline">Prev</span>
               </Button>
 
-              {/* Page Numbers */}
-              <div className="flex items-center gap-1">
-                {pageNumbers.map((pageNum, index) => (
-                  pageNum === '...' ? (
-                    <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-500">
-                      ...
-                    </span>
-                  ) : (
-                    <Button
-                      key={pageNum}
-                      onClick={() => setPage(pageNum)}
-                      className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
-                        page === pageNum
-                          ? 'bg-green-600 text-white border-green-600 shadow-md'
-                          : 'bg-white hover:bg-gray-50 border-gray-300'
-                      }`}
-                    >
-                      {pageNum}
-                    </Button>
-                  )
-                ))}
-              </div>
+              {/* Current Page Indicator */}
+              <span className="flex items-center justify-center min-w-[2.5rem] px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm font-semibold shadow-sm ring-2 ring-yellow-300" aria-current="page">
+                {page}
+              </span>
 
-              {/* Next Page */}
+              {/* Next */}
               <Button
+                onClick={() => fetchExpenses(page + 1)}
                 disabled={page >= totalPages}
-                onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition"
+                aria-label="Go to next page"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-yellow-500 text-white hover:bg-yellow-600 disabled:bg-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors shadow-sm"
               >
-                <span className="hidden sm:inline">Next</span>
+                <span className="hidden md:inline">Next</span>
                 <FiChevronRight className="w-4 h-4" />
               </Button>
 
-              {/* Last Page */}
+              {/* Last */}
               <Button
+                onClick={() => fetchExpenses(totalPages)}
                 disabled={page >= totalPages}
-                onClick={() => setPage(totalPages)}
-                className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition"
-                title="Last Page"
+                aria-label="Go to last page"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-red-500 text-white hover:bg-red-600 disabled:bg-red-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors shadow-sm"
               >
+                <span className="hidden md:inline">Last</span>
                 <FiChevronsRight className="w-4 h-4" />
+              </Button>
+
+            </nav>
+          </div>
+        )}
+
+
+      {/* Create/Edit Modal */}
+      {modalOpen && (
+        <Modal
+          title={selectedExpense ? 'Edit Expense' : 'Add New Expense'}
+          onClose={handleModalClose}
+          onSubmit={handleSubmit}
+          submitText={submitting ? 'Saving...' : (selectedExpense ? 'Update' : 'Create')}
+          disabled={submitting}
+          size="large"
+        >
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+            {uploadProgress > 0 && uploadProgress < 100 && (
+              <div className="bg-blue-50 p-3 rounded">
+                <div className="text-sm text-blue-800 mb-1">Uploading... {uploadProgress}%</div>
+                <div className="w-full bg-blue-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <Input
+              label="Description *"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="e.g., Monthly utilities payment"
+              required
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Amount (Total including VAT) *"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.amount}
+                onChange={(e) => handleAmountChange(e.target.value)}
+                placeholder="1180.00"
+                required
+              />
+
+              <Input
+                label="VAT Rate (%)"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={formData.vatRate}
+                onChange={(e) => handleVatRateChange(e.target.value)}
+                placeholder="18"
+              />
+            </div>
+
+            {formData.vatAmount && parseFloat(formData.vatAmount) > 0 && (
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <div className="text-sm text-blue-800 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Base Amount:</span>
+                    <span className="font-semibold">
+                      {formatCurrency(parseFloat(formData.amount) - parseFloat(formData.vatAmount), formData.currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>VAT Amount ({formData.vatRate}%):</span>
+                    <span className="font-semibold">
+                      {formatCurrency(parseFloat(formData.vatAmount), formData.currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t border-blue-300 pt-1 mt-1">
+                    <span className="font-bold">Total Amount:</span>
+                    <span className="font-bold">
+                      {formatCurrency(parseFloat(formData.amount), formData.currency)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select
+                label="Category *"
+                value={categoryOptions.find(opt => opt.value === formData.category)}
+                options={categoryOptions}
+                onChange={(selected) => setFormData({ ...formData, category: selected?.value || '' })}
+                placeholder="Select category..."
+                required
+              />
+
+              <Select
+                label="Currency *"
+                value={currencyOptions.find(opt => opt.value === formData.currency)}
+                options={currencyOptions}
+                onChange={(selected) => setFormData({ ...formData, currency: selected?.value || 'RWF' })}
+                isSearchable={false}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select
+                label="Property *"
+                value={propertyOptions.find(p => p.value === formData.propertyId)}
+                options={propertyOptions}
+                onChange={(selected) => setFormData({ 
+                  ...formData, 
+                  propertyId: selected?.value || '',
+                  localId: '' // Reset local when property changes
+                })}
+                placeholder="Select property..."
+                isSearchable
+                required
+              />
+
+              <Select
+                label="Local (Optional)"
+                value={localOptions.find(l => l.value === formData.localId)}
+                options={localOptions}
+                onChange={(selected) => setFormData({ ...formData, localId: selected?.value || '' })}
+                placeholder="Select local..."
+                isSearchable
+                isDisabled={!formData.propertyId}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Vendor"
+                value={formData.vendor}
+                onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
+                placeholder="Vendor name"
+              />
+
+              <Input
+                label="Invoice Number"
+                value={formData.invoiceNumber}
+                onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
+                placeholder="INV-001"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select
+                label="Payment Status *"
+                value={paymentStatusOptions.find(opt => opt.value === formData.paymentStatus)}
+                options={paymentStatusOptions}
+                onChange={(selected) => setFormData({ ...formData, paymentStatus: selected?.value || 'pending' })}
+                isSearchable={false}
+                required
+              />
+
+              <Select
+                label="Payment Method"
+                value={paymentMethodOptions.find(opt => opt.value === formData.paymentMethod)}
+                options={paymentMethodOptions}
+                onChange={(selected) => setFormData({ ...formData, paymentMethod: selected?.value || '' })}
+                placeholder="Select method..."
+                isSearchable={false}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Due Date"
+                type="date"
+                value={formData.dueDate}
+                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+              />
+
+              <Input
+                label="Payment Date"
+                type="date"
+                value={formData.paymentDate}
+                onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Proof File {selectedExpense?.proof_file_name && '(Optional - Current file will be kept if not replaced)'}
+              </label>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                onChange={handleFileChange}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Max file size: 5MB. Supported: PDF, JPG, PNG, DOC, DOCX
+              </p>
+              {selectedExpense?.proof_file_name && (
+                <p className="text-xs text-blue-600 mt-1">
+                  Current file: {selectedExpense.proof_file_name}
+                </p>
+              )}
+              {formData.proofFile && (
+                <p className="text-xs text-green-600 mt-1">
+                  New file selected: {formData.proofFile.name}
+                </p>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Bulk Update Modal */}
+      {bulkModalOpen && (
+        <Modal
+          title="Bulk Update Payment Status"
+          onClose={() => setBulkModalOpen(false)}
+          onSubmit={() => {
+            const status = document.getElementById('bulk-status').value;
+            const date = document.getElementById('bulk-date').value;
+            const method = document.getElementById('bulk-method').value;
+            handleBulkUpdate(status, date, method);
+          }}
+          submitText="Update All"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Update payment status for {selectedExpenses.length} selected expense(s)
+            </p>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Payment Status *
+              </label>
+              <select
+                id="bulk-status"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                defaultValue="paid"
+              >
+                {paymentStatusOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Payment Date
+              </label>
+              <input
+                type="date"
+                id="bulk-date"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                defaultValue={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Payment Method
+              </label>
+              <select
+                id="bulk-method"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="">Select method...</option>
+                {paymentMethodOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Filter Modal */}
+      {filterModalOpen && (
+        <Modal
+          title="Filter Expenses"
+          onClose={() => setFilterModalOpen(false)}
+          onSubmit={() => {
+            setFilterModalOpen(false);
+            setPage(1);
+          }}
+          submitText="Apply Filters"
+          size="large"
+        >
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+            <Input
+              label="Search"
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              placeholder="Search description, vendor, invoice..."
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select
+                label="Category"
+                value={categoryOptions.find(opt => opt.value === filters.category)}
+                options={categoryOptions}
+                onChange={(selected) => setFilters({ ...filters, category: selected?.value || '' })}
+                placeholder="All categories"
+                isClearable
+              />
+
+              <Select
+                label="Payment Status"
+                value={paymentStatusOptions.find(opt => opt.value === filters.paymentStatus)}
+                options={paymentStatusOptions}
+                onChange={(selected) => setFilters({ ...filters, paymentStatus: selected?.value || '' })}
+                placeholder="All statuses"
+                isClearable
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select
+                label="Property"
+                value={propertyOptions.find(p => p.value === filters.propertyId)}
+                options={propertyOptions}
+                onChange={(selected) => setFilters({ ...filters, propertyId: selected?.value || '' })}
+                placeholder="All properties"
+                isSearchable
+                isClearable
+              />
+
+              <Select
+                label="Currency"
+                value={currencyOptions.find(opt => opt.value === filters.currency)}
+                options={currencyOptions}
+                onChange={(selected) => setFilters({ ...filters, currency: selected?.value || '' })}
+                placeholder="All currencies"
+                isClearable
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Start Date"
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+              />
+
+              <Input
+                label="End Date"
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Min Amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={filters.minAmount}
+                onChange={(e) => setFilters({ ...filters, minAmount: e.target.value })}
+                placeholder="0.00"
+              />
+
+              <Input
+                label="Max Amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={filters.maxAmount}
+                onChange={(e) => setFilters({ ...filters, maxAmount: e.target.value })}
+                placeholder="10000.00"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4 border-t">
+              <Button
+                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+                onClick={() => {
+                  setFilters({
+                    search: '',
+                    category: '',
+                    paymentStatus: '',
+                    propertyId: '',
+                    localId: '',
+                    currency: '',
+                    startDate: '',
+                    endDate: '',
+                    minAmount: '',
+                    maxAmount: '',
+                  });
+                }}
+              >
+                Clear All Filters
               </Button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Add/Edit Modal */}
-      {modalOpen && (
-        <Modal
-          title={editData.id ? 'Edit Expense' : 'Add Expense'}
-          onClose={() => {
-            setModalOpen(false);
-            setEditData({});
-          }}
-          onSubmit={handleSubmit}
-          submitLoading={submitLoading}
-        >
-          <ExpenseForm
-            editData={editData}
-            setEditData={setEditData}
-            properties={properties}
-            locals={locals}
-            onSubmit={handleSubmit}
-            submitLoading={submitLoading}
-          />
         </Modal>
       )}
     </div>

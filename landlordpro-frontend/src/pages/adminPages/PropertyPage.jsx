@@ -2,16 +2,17 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { 
   getAllProperties, 
   createProperty, 
-  updateProperty, 
-  deleteProperty 
+  updateProperty 
 } from '../../services/propertyService';
+import { getAllManagers } from '../../services/userService';
 import { Button, Modal, Input, Card, Checkbox } from '../../components';
-import { FiEdit, FiPlus, FiTrash, FiSearch, FiLayers } from 'react-icons/fi';
-import { showSuccess, showError, showInfo } from '../../utils/toastHelper';
+import { FiEdit, FiPlus, FiSearch, FiLayers } from 'react-icons/fi';
+import { showSuccess, showError } from '../../utils/toastHelper';
 import { useNavigate } from 'react-router-dom';
 
 const PropertyPage = () => {
   const [properties, setProperties] = useState([]);
+  const [managers, setManagers] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [editData, setEditData] = useState({ 
@@ -19,7 +20,8 @@ const PropertyPage = () => {
     location: '', 
     description: '', 
     number_of_floors: 1, 
-    has_basement: false 
+    has_basement: false,
+    manager_id: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -34,13 +36,10 @@ const PropertyPage = () => {
     try {
       setLoading(true);
       const data = await getAllProperties(pageNumber, 10);
-      
-      // Safe destructuring with defaults
       const propertiesArray = data?.properties || [];
       const totalPagesCount = data?.totalPages || 1;
       const currentPage = data?.page || pageNumber;
 
-      // If no properties on current page and not first page, go back
       if (propertiesArray.length === 0 && pageNumber > 1) {
         return fetchProperties(pageNumber - 1);
       }
@@ -59,11 +58,21 @@ const PropertyPage = () => {
     }
   };
 
+  // Fetch managers
+  const fetchManagers = async () => {
+    try {
+      const data = await getAllManagers();
+      setManagers(data || []);
+    } catch (err) {
+      showError('Failed to fetch managers');
+    }
+  };
+
   useEffect(() => {
     fetchProperties();
-  }, []); // Remove page dependency to avoid infinite loops
+    fetchManagers();
+  }, []);
 
-  // Open modal for edit
   const handleEditClick = (property) => {
     setSelectedProperty(property);
     setEditData({ 
@@ -71,24 +80,21 @@ const PropertyPage = () => {
       location: property.location || '', 
       description: property.description || '', 
       number_of_floors: property.number_of_floors || 1, 
-      has_basement: property.has_basement || false 
+      has_basement: property.has_basement || false,
+      manager_id: property.manager_id || ''
     });
     setModalOpen(true);
   };
 
-  // View floors for a property
-  // In PropertyPage.jsx
-const handleViewFloors = (property) => {
-  navigate(`/admin/properties/${property.id}/floors`);
-};
+  const handleViewFloors = (property) => {
+    navigate(`/admin/properties/${property.id}/floors`);
+  };
 
-  // Submit create/update
   const handleSubmit = async () => {
     if (submitting) return;
     
-    const { name, location, description, number_of_floors, has_basement } = editData;
+    const { name, location, description, number_of_floors, has_basement, manager_id } = editData;
 
-    // Frontend validation
     if (!name?.trim() || !location?.trim()) {
       showError('Name and location are required.');
       return;
@@ -101,13 +107,13 @@ const handleViewFloors = (property) => {
 
     setSubmitting(true);
     try {
-      // Build payload
       const payload = {
         name: name.trim(),
         location: location.trim(),
         description: description?.trim() || null,
         number_of_floors: parseInt(number_of_floors) || 1,
         has_basement: Boolean(has_basement),
+        manager_id: manager_id || null // assign manager
       };
 
       if (selectedProperty) {
@@ -116,10 +122,10 @@ const handleViewFloors = (property) => {
       } else {
         await createProperty(payload);
         showSuccess('Property added successfully!');
-        setPage(1); // Reset to first page for new items
+        setPage(1);
       }
 
-      await fetchProperties(selectedProperty ? page : 1); // Refresh with current page or first page
+      await fetchProperties(selectedProperty ? page : 1);
       setModalOpen(false);
       resetForm();
     } catch (err) {
@@ -130,20 +136,6 @@ const handleViewFloors = (property) => {
     }
   };
 
-  // Delete property
-  const handleDelete = async (property) => {
-    if (!window.confirm(`Are you sure you want to delete "${property.name}"?`)) return;
-
-    try {
-      await deleteProperty(property.id);
-      showInfo('Property deleted successfully.');
-      await fetchProperties(page); // Refresh current page
-    } catch (err) {
-      showError(err?.message || 'Failed to delete property');
-    }
-  };
-
-  // Reset form
   const resetForm = () => {
     setSelectedProperty(null);
     setEditData({
@@ -151,16 +143,14 @@ const handleViewFloors = (property) => {
       location: '',
       description: '',
       number_of_floors: 1,
-      has_basement: false
+      has_basement: false,
+      manager_id: ''
     });
   };
 
-  // Filter properties by search term
   const filteredProperties = useMemo(() => {
     if (!Array.isArray(properties)) return [];
-    
     if (!searchTerm.trim()) return properties;
-    
     const searchLower = searchTerm.toLowerCase();
     return properties.filter(p =>
       p.name?.toLowerCase().includes(searchLower) ||
@@ -169,7 +159,6 @@ const handleViewFloors = (property) => {
     );
   }, [properties, searchTerm]);
 
-  // Handle modal close
   const handleModalClose = () => {
     setModalOpen(false);
     resetForm();
@@ -199,7 +188,7 @@ const handleViewFloors = (property) => {
           placeholder="Search by name, location, or description..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 w-full border-gray-300 rounded-lg"
+          className="pl-10 w-full border-gray-300 rounded-lg text-white"
         />
       </div>
 
@@ -217,58 +206,60 @@ const handleViewFloors = (property) => {
                   <th className="p-3 font-semibold text-left">Description</th>
                   <th className="p-3 font-semibold text-left">Floors</th>
                   <th className="p-3 font-semibold text-left">Basement</th>
+                  <th className="p-3 font-semibold text-left">Manager</th>
                   <th className="p-3 text-center font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProperties.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-6 text-center text-gray-500">
+                    <td colSpan={7} className="p-6 text-center text-gray-500">
                       {properties.length === 0 ? 'No properties found' : 'No properties match your search'}
                     </td>
                   </tr>
                 ) : (
-                  filteredProperties.map(property => (
-                    <tr key={property.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
-                      <td className="p-3 font-medium text-gray-800">{property.name}</td>
-                      <td className="p-3">{property.location}</td>
-                      <td className="p-3 max-w-xs truncate" title={property.description}>
-                        {property.description || '-'}
-                      </td>
-                      <td className="p-3 text-center">{property.number_of_floors}</td>
-                      <td className="p-3 text-center">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          property.has_basement 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {property.has_basement ? 'Yes' : 'No'}
-                        </span>
-                      </td>
-                      <td className="p-3 flex justify-center gap-2">
-                        {/* View Floors Button */}
-                        <Button
-                          className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1 transition-colors"
-                          onClick={() => handleViewFloors(property)}
-                          title={`View floors for ${property.name}`}
-                        >
-                          <FiLayers className="text-sm" /> Floors
-                        </Button>
-                        <Button
-                          className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1 transition-colors"
-                          onClick={() => handleEditClick(property)}
-                        >
-                          <FiEdit className="text-sm" /> Edit
-                        </Button>
-                        <Button
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1 transition-colors"
-                          onClick={() => handleDelete(property)}
-                        >
-                          <FiTrash className="text-sm" /> Delete
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
+                  filteredProperties.map(property => {
+                    const manager = managers.find(m => m.id === property.manager_id);
+                    const rowClass = `hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                      !manager ? 'bg-red-50' : ''
+                    }`;
+
+                    return (
+                      <tr key={property.id} className={rowClass}>
+                        <td className="p-3 font-medium text-gray-800">{property.name}</td>
+                        <td className="p-3">{property.location}</td>
+                        <td className="p-3 max-w-xs truncate" title={property.description}>
+                          {property.description || '-'}
+                        </td>
+                        <td className="p-3 text-center">{property.number_of_floors}</td>
+                        <td className="p-3 text-center">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            property.has_basement 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {property.has_basement ? 'Yes' : 'No'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">{manager ? manager.full_name : '—'}</td>
+                        <td className="p-3 flex justify-center gap-2">
+                          <Button
+                            className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1 transition-colors"
+                            onClick={() => handleViewFloors(property)}
+                            title={`View floors for ${property.name}`}
+                          >
+                            <FiLayers className="text-sm" /> Floors
+                          </Button>
+                          <Button
+                            className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1 transition-colors"
+                            onClick={() => handleEditClick(property)}
+                          >
+                            <FiEdit className="text-sm" /> Edit
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -366,6 +357,25 @@ const handleViewFloors = (property) => {
               checked={editData.has_basement}
               onChange={(e) => setEditData({ ...editData, has_basement: e.target.checked })}
             />
+
+            {/* Assign Manager Dropdown */}
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-1">
+                Assign Manager
+              </label>
+              <select
+                className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={editData.manager_id || ''}
+                onChange={(e) => setEditData({ ...editData, manager_id: e.target.value })}
+              >
+                <option value="">-- Select a manager --</option>
+                {managers.map(manager => (
+                  <option key={manager.id} value={manager.id}>
+                    {manager.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </Modal>
       )}

@@ -28,61 +28,120 @@ function formatLease(lease) {
   };
 }
 
-/** Helper: Check overlapping active leases */
+/** Helper: Check overlapping active leases - DEBUGGED VERSION */
 async function checkOverlap(localId, start, end, excludeLeaseId = null) {
-  const overlapping = await Lease.findOne({
-    where: {
-      local_id: localId,
-      status: 'active',
-      id: excludeLeaseId ? { [Op.ne]: excludeLeaseId } : undefined,
-      [Op.or]: [
-        { start_date: { [Op.between]: [start, end] } },
-        { end_date: { [Op.between]: [start, end] } },
-        { start_date: { [Op.lte]: start }, end_date: { [Op.gte]: end } }
-      ]
+  try {
+    console.log('checkOverlap called with:', { localId, start, end, excludeLeaseId });
+    
+    // Validate localId is not undefined
+    if (!localId) {
+      throw new Error('localId is undefined in checkOverlap');
     }
-  });
-  if (overlapping) throw new Error('Lease overlaps with an existing active lease for this local');
+
+    const whereClause = {
+      local_id: localId,
+      status: 'active'
+    };
+
+    // Only add id condition if excludeLeaseId is provided and valid
+    if (excludeLeaseId) {
+      whereClause.id = { [Op.ne]: excludeLeaseId };
+    }
+
+    whereClause[Op.or] = [
+      { start_date: { [Op.between]: [start, end] } },
+      { end_date: { [Op.between]: [start, end] } },
+      { start_date: { [Op.lte]: start }, end_date: { [Op.gte]: end } }
+    ];
+
+    console.log('checkOverlap whereClause:', JSON.stringify(whereClause, null, 2));
+
+    const overlapping = await Lease.findOne({ where: whereClause });
+    
+    if (overlapping) {
+      throw new Error('Lease overlaps with an existing active lease for this local');
+    }
+  } catch (error) {
+    console.error('Error in checkOverlap:', error);
+    throw error;
+  }
 }
 
-/** Create a new lease */
+/** Create a new lease - COMPLETELY DEBUGGED VERSION */
 async function createLease({ startDate, endDate, leaseAmount, localId, tenantId, status = 'active' }) {
-  if (!startDate || !endDate || !leaseAmount || !localId || !tenantId) {
-    throw new Error('Missing required fields: startDate, endDate, leaseAmount, localId, tenantId');
+  try {
+    console.log('createLease called with:', { startDate, endDate, leaseAmount, localId, tenantId, status });
+
+    // Validate all parameters are provided and not undefined
+    if (!startDate || !endDate || !leaseAmount || !localId || !tenantId) {
+      throw new Error('Missing required fields: startDate, endDate, leaseAmount, localId, tenantId');
+    }
+
+    // Validate UUID formats
+    const isValidUUID = (uuid) => {
+      if (!uuid || typeof uuid !== 'string') return false;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(uuid);
+    };
+
+    if (!isValidUUID(localId)) {
+      throw new Error(`Invalid localId format: ${localId}`);
+    }
+    if (!isValidUUID(tenantId)) {
+      throw new Error(`Invalid tenantId format: ${tenantId}`);
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (start >= end) throw new Error('startDate must be before endDate');
+
+    console.log('Calling checkOverlap...');
+    await checkOverlap(localId, start, end);
+
+    // Fetch tenant to get name for reference
+    console.log('Fetching tenant...');
+    const tenant = await Tenant.findByPk(tenantId);
+    if (!tenant) throw new Error('Tenant not found');
+
+    const tenantNameClean = tenant.name.replace(/\s+/g, '-').toUpperCase();
+    const shortId = uuidv4().split('-')[0].toUpperCase();
+    const reference = `LEASE-${tenantNameClean}-${shortId}`;
+
+    console.log('Creating lease record...');
+    const lease = await Lease.create({
+      start_date: start,
+      end_date: end,
+      lease_amount: Number(leaseAmount),
+      local_id: localId,
+      tenant_id: tenantId,
+      status,
+      reference,
+    });
+
+    console.log('Lease created successfully, ID:', lease.id);
+
+    // Return minimal response to avoid any association issues
+    return {
+      id: lease.id,
+      reference: lease.reference,
+      startDate: lease.start_date,
+      endDate: lease.end_date,
+      leaseAmount: lease.lease_amount,
+      status: lease.status,
+      localId: localId,
+      tenantId: tenantId,
+      createdAt: lease.created_at,
+      updatedAt: lease.updated_at
+    };
+
+  } catch (error) {
+    console.error('Error in createLease:', {
+      message: error.message,
+      stack: error.stack,
+      data: { startDate, endDate, leaseAmount, localId, tenantId, status }
+    });
+    throw error;
   }
-
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  if (start >= end) throw new Error('startDate must be before endDate');
-
-  await checkOverlap(localId, start, end);
-
-  // Fetch tenant to get name for reference
-  const tenant = await Tenant.findByPk(tenantId);
-  if (!tenant) throw new Error('Tenant not found');
-
-  const tenantNameClean = tenant.name.replace(/\s+/g, '-').toUpperCase();
-  const shortId = uuidv4().split('-')[0].toUpperCase();
-  const reference = `LEASE-${tenantNameClean}-${shortId}`;
-
-  const lease = await Lease.create({
-    start_date: start,
-    end_date: end,
-    lease_amount: Number(leaseAmount),
-    local_id: localId,
-    tenant_id: tenantId,
-    status,
-    reference,
-  });
-
-  await lease.reload({
-    include: [
-      { model: Tenant, as: 'tenant', attributes: ['id', 'name', 'email'] },
-      { model: Local, as: 'local', attributes: ['id', 'reference_code', 'status', 'size_m2'] }
-    ]
-  });
-
-  return formatLease(lease);
 }
 
 /** Update lease by ID */

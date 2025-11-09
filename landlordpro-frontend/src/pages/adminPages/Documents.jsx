@@ -576,9 +576,9 @@ const Documents = () => {
   };
 
   return (
-    <div className="space-y-6 pt-12 px-3 sm:px-6">
+    <div className="space-y-6 pt-12 px-3 sm:px-6 mt-3">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
           <p className="text-gray-600">Manage expenses and payments</p>
@@ -587,14 +587,14 @@ const Documents = () => {
           <Button 
             variant="outline" 
             onClick={() => setActiveTab('expenses')} 
-            className={activeTab === 'expenses' ? 'bg-blue-50 border-blue-200' : ''}
+            className={activeTab === 'expenses' ? 'bg-red-500 hover:bg-red-600 text-white border-blue-200' : ''}
           >
             Expenses
           </Button>
           <Button 
             variant="outline" 
             onClick={() => setActiveTab('payments')} 
-            className={activeTab === 'payments' ? 'bg-blue-50 border-blue-200' : ''}
+            className={activeTab === 'payments' ? 'bg-yellow-500 hover:bg-yellow-600 text-white border-blue-200' : ''}
           >
             Payments
           </Button>

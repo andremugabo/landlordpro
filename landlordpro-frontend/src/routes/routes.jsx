@@ -39,6 +39,7 @@ export const router = createBrowserRouter([
     element: <Layouts.ManagerLayout />,
     children: [
       { index: true, element: <Pages.ManagerDashboard /> },
+      { path: '/manager/properties', element: <Pages.PropertyPage /> },
     ]
   }
 ]);

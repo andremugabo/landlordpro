@@ -92,3 +92,34 @@ exports.getFloorsByPropertyId = async (req, res) => {
     handleError(res, err, 'Failed to fetch floors.');
   }
 };
+
+// =====================================================
+// ✅ Assign Manager to Property (Admin only)
+// =====================================================
+exports.assignManager = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const { manager_id } = req.body;
+
+    if (!manager_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'manager_id is required.'
+      });
+    }
+
+    // Only admins can assign/change managers
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only admins can assign a manager.'
+      });
+    }
+
+    const result = await propertyService.assignPropertyToManager(propertyId, manager_id);
+    res.status(200).json(result);
+
+  } catch (err) {
+    handleError(res, err, 'Failed to assign manager to property.', 400);
+  }
+};

@@ -1,7 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const Joi = require('joi');
 const { Op } = require('sequelize');
-const { Property, Floor } = require('../models');
+const { Property, Floor, User } = require('../models');
 
 // ================================
 // ✅ Validation Schema
@@ -12,7 +12,12 @@ const propertySchema = Joi.object({
   description: Joi.string().allow('').optional(),
   number_of_floors: Joi.number().integer().min(1).required(),
   has_basement: Joi.boolean().required(),
-  manager_id: Joi.string().uuid().optional() // for linking to manager
+  manager_id: Joi.string().uuid().optional() 
+});
+
+const assignSchema = Joi.object({
+  property_id: Joi.string().uuid().required(),
+  manager_id: Joi.string().uuid().required()
 });
 
 // ================================
@@ -26,7 +31,6 @@ async function createProperty(data, user) {
     throw err;
   }
 
-  // If manager is creating the property, automatically assign them as manager
   if (user.role === 'manager') {
     value.manager_id = user.id;
   }
@@ -35,7 +39,6 @@ async function createProperty(data, user) {
 
   const property = await Property.create(value);
 
-  // Automatically create floors
   const floors = [];
 
   if (value.has_basement) {
@@ -73,7 +76,7 @@ async function getAllProperties(user, page = 1, limit = 10) {
 
   const whereClause = { deleted_at: null };
   if (user.role === 'manager') {
-    whereClause.manager_id = user.id; // Restrict to manager’s properties
+    whereClause.manager_id = user.id; 
   }
 
   const [total, properties] = await Promise.all([
@@ -105,7 +108,7 @@ async function getAllProperties(user, page = 1, limit = 10) {
 async function getPropertyById(id, user) {
   const whereClause = { id, deleted_at: null };
   if (user.role === 'manager') {
-    whereClause.manager_id = user.id; // Restrict access
+    whereClause.manager_id = user.id;
   }
 
   const property = await Property.findOne({
@@ -136,7 +139,6 @@ async function updateProperty(id, data, user) {
     throw err;
   }
 
-  // Restrict managers to their own properties
   const whereClause = { id, deleted_at: null };
   if (user.role === 'manager') whereClause.manager_id = user.id;
 
@@ -159,10 +161,6 @@ async function updateProperty(id, data, user) {
   const newNumFloors = property.number_of_floors;
   const newHasBasement = property.has_basement;
 
-  // ===============================
-  // 🧱 FLOOR SYNCHRONIZATION LOGIC
-  // ===============================
-
   // Basement addition/removal
   if (newHasBasement && !oldHasBasement) {
     await Floor.create({
@@ -182,7 +180,7 @@ async function updateProperty(id, data, user) {
         id: uuidv4(),
         property_id: property.id,
         level_number: i,
-        name: i === 0 ? 'Ground Floor' : `Floor ${i}`
+        name: `Floor ${i}`
       });
     }
   } else if (newNumFloors < oldNumFloors) {
@@ -224,10 +222,59 @@ async function deleteProperty(id, user) {
   };
 }
 
+// ================================
+// ✅ Assign Property to Manager
+// ================================
+async function assignPropertyToManager(data, user) {
+  if (user.role !== 'admin') {
+    const err = new Error('Only admins can assign a property to a manager.');
+    err.status = 403;
+    throw err;
+  }
+
+  const { error, value } = assignSchema.validate(data);
+  if (error) {
+    const err = new Error(error.details[0].message);
+    err.status = 400;
+    throw err;
+  }
+
+  const { property_id, manager_id } = value;
+
+  const property = await Property.findOne({ where: { id: property_id, deleted_at: null } });
+  if (!property) {
+    const err = new Error('Property not found.');
+    err.status = 404;
+    throw err;
+  }
+
+  const manager = await User.findOne({ where: { id: manager_id, is_active: true } });
+  if (!manager) {
+    const err = new Error('Manager not found or inactive.');
+    err.status = 404;
+    throw err;
+  }
+
+  if (manager.role !== 'manager') {
+    const err = new Error('Selected user is not a manager.');
+    err.status = 400;
+    throw err;
+  }
+
+  await property.update({ manager_id });
+
+  return {
+    success: true,
+    message: `Property assigned to manager ${manager.full_name}`,
+    data: property
+  };
+}
+
 module.exports = {
   createProperty,
   getAllProperties,
   getPropertyById,
   updateProperty,
-  deleteProperty
+  deleteProperty,
+  assignPropertyToManager
 };

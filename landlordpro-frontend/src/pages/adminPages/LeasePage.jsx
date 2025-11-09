@@ -27,42 +27,75 @@ const LeasePage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const PAGE_SIZE = 10;
 
-  // ✅ Fetch tenants and locals
+  // ✅ Fetch tenants and locals with corrected parameter structure
   const fetchTenantsAndLocals = async () => {
     try {
-      const tenantsData = await getAllTenants(1, 100);
-      const localsData = await getAllLocals(1, 100);
-      setTenants(tenantsData.tenants || []);
-      setLocals(localsData.locals || []);
-    } catch {
+      setError(null);
+      const [tenantsData, localsData] = await Promise.all([
+        getAllTenants(1, 100), // This uses (page, limit) format
+        getAllLocals({ page: 1, limit: 100 }) // This uses params object format
+      ]);
+      
+      // console.log('Tenants API response:', tenantsData);
+      // console.log('Locals API response:', localsData);
+      
+      // Based on your tenant service, the response should be { tenants, totalPages, page }
+      setTenants(tenantsData.tenants || tenantsData.data || []);
+      
+      // Based on your local service, the response could be { data: [], locals: [], etc. }
+      // Use the extractLocalsData utility if available, otherwise handle different structures
+      const localsArray = localsData.data || localsData.locals || localsData || [];
+      setLocals(Array.isArray(localsArray) ? localsArray : []);
+    } catch (err) {
+      console.error('Error fetching tenants or locals:', err);
+      setError('Failed to fetch tenants or locals');
       showError('Failed to fetch tenants or locals');
     }
   };
 
   const fetchPropertiesData = async () => {
     try {
+      setError(null);
+      // Assuming properties service has similar structure to tenants
       const res = await getAllProperties(1, 100);
-      setProperties(res.properties || []);
-    } catch {
+      // console.log('Properties API response:', res);
+      setProperties(res.properties || res.data || []);
+    } catch (err) {
+      console.error('Error fetching properties:', err);
+      setError('Failed to fetch properties');
       showError('Failed to fetch properties');
     }
   };
 
-  // ✅ Fetch leases
+  // ✅ Fetch leases with corrected API response handling
   const fetchLeases = async (pageNumber = 1, filterStatus = '', term = '') => {
     try {
       setLoading(true);
-      const res = await leaseService.getLeases(pageNumber, PAGE_SIZE, filterStatus);
-      const leasesData = res.data || [];
-      setLeases(leasesData);
+      setError(null);
+      
+      // Assuming leaseService follows similar pattern to tenantService
+      const res = await leaseService.getLeases(pageNumber, PAGE_SIZE, filterStatus, term);
+      
+      // console.log('Leases API response:', res);
+      
+      // Handle different possible response structures
+      const leasesData = res.data || res.leases || res || [];
+      const totalCount = res.total || res.totalCount || res.totalItems || 
+                        (Array.isArray(leasesData) ? leasesData.length : 0);
+      
+      setLeases(Array.isArray(leasesData) ? leasesData : []);
       setPage(pageNumber);
-      setTotalPages(Math.ceil((res.total || leasesData.length) / PAGE_SIZE));
-    } catch {
+      setTotalPages(Math.ceil(totalCount / PAGE_SIZE) || 1);
+    } catch (err) {
+      // console.error('Error fetching leases:', err);
+      setError('Failed to fetch leases: ' + (err.message || 'Unknown error'));
       showError('Failed to fetch leases');
+      setLeases([]);
     } finally {
       setLoading(false);
     }
@@ -71,52 +104,72 @@ const LeasePage = () => {
   useEffect(() => {
     fetchTenantsAndLocals();
     fetchPropertiesData();
+    fetchLeases(1); // Initial fetch
   }, []);
 
+  // Reset to page 1 when filters change
   useEffect(() => {
-    fetchLeases(page, statusFilter, searchTerm);
-  }, [page, statusFilter, searchTerm]);
+    setPage(1);
+    fetchLeases(1, statusFilter, searchTerm);
+  }, [statusFilter, searchTerm]);
 
-  const tenantsOptions = tenants.map(t => ({ value: t.id, label: t.name }));
-  const propertiesOptions = properties.map(p => ({ value: p.id, label: p.name }));
+  const tenantsOptions = tenants.map(t => ({ 
+    value: t.id, 
+    label: t.name || `${t.first_name || ''} ${t.last_name || ''}`.trim() || `Tenant ${t.id}`
+  }));
+  
+  const propertiesOptions = properties.map(p => ({ 
+    value: p.id, 
+    label: p.name || p.property_name || `Property ${p.id}` 
+  }));
 
+  // ✅ Client-side filtering as fallback
   const filteredLeases = useMemo(
     () =>
       leases.filter(
         l =>
           l.tenant?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          l.local?.reference_code?.toLowerCase().includes(searchTerm.toLowerCase())
+          l.tenant?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          l.tenant?.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          l.local?.reference_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          l.local?.referenceCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          l.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          l.local?.code?.toLowerCase().includes(searchTerm.toLowerCase())
       ),
     [leases, searchTerm]
   );
 
-  // ✅ Edit Lease
+  // ✅ Edit Lease with improved property handling
   const handleEditClick = lease => {
+    console.log('Editing lease:', lease);
     setSelectedLease(lease);
     
-    // Filter locals based on the lease's property
-    const propertyId = lease.local?.property_id || lease.local?.propertyId || '';
+    // Handle different possible property name variations
+    const propertyId = lease.local?.property_id || lease.local?.propertyId || 
+                      lease.property_id || lease.propertyId || '';
+    
     const localsForProperty = locals.filter(l => 
       (l.property_id || l.propertyId) === propertyId
     );
     setFilteredLocals(localsForProperty);
     
     setEditData({
-      startDate: lease.startDate?.split('T')[0] || '',
-      endDate: lease.endDate?.split('T')[0] || '',
+      startDate: lease.start_date?.split('T')[0] || lease.startDate?.split('T')[0] || '',
+      endDate: lease.end_date?.split('T')[0] || lease.endDate?.split('T')[0] || '',
       status: lease.status || 'active',
-      tenantId: lease.tenant?.id || '',
+      tenantId: lease.tenant_id || lease.tenant?.id || '',
       propertyId: propertyId,
-      localId: lease.local?.id || '',
-      leaseAmount: lease.leaseAmount || '',
+      localId: lease.local_id || lease.local?.id || '',
+      leaseAmount: lease.lease_amount || lease.leaseAmount || '',
     });
     setModalOpen(true);
   };
 
-  // ✅ Submit (Create or Update)
+  // ✅ Submit (Create or Update) - FIXED: Use camelCase field names
   const handleSubmit = async () => {
     const { startDate, endDate, status, tenantId, localId, leaseAmount } = editData;
-    console.log(editData)
+    console.log('Submitting lease data:', editData);
+    
     if (!startDate || !endDate || !tenantId || !localId || !leaseAmount) {
       showError('All fields are required');
       return;
@@ -127,14 +180,17 @@ const LeasePage = () => {
     }
 
     try {
+      // Use camelCase field names that match exactly what your leaseService expects
       const payload = {
-        startDate,
-        endDate,
-        status,
-        tenantId,
-        localId,
+        startDate: startDate,
+        endDate: endDate,
+        status: status,
+        tenantId: tenantId,
+        localId: localId,
         leaseAmount: Number(leaseAmount),
       };
+
+      console.log('Sending payload to leaseService:', payload);
 
       if (selectedLease) {
         await leaseService.updateLease(selectedLease.id, payload);
@@ -157,8 +213,9 @@ const LeasePage = () => {
         leaseAmount: '',
       });
       setFilteredLocals([]);
-    } catch {
-      showError('Failed to save lease');
+    } catch (err) {
+      console.error('Error saving lease:', err);
+      showError(err.message || 'Failed to save lease');
     }
   };
 
@@ -169,8 +226,9 @@ const LeasePage = () => {
       await leaseService.deleteLease(lease.id);
       showInfo('Lease deleted successfully');
       fetchLeases(page, statusFilter, searchTerm);
-    } catch {
-      showError('Failed to delete lease');
+    } catch (err) {
+      console.error('Error deleting lease:', err);
+      showError(err.message || 'Failed to delete lease');
     }
   };
 
@@ -179,8 +237,9 @@ const LeasePage = () => {
     try {
       await leaseService.downloadPdfReport();
       showSuccess('PDF report downloaded!');
-    } catch {
-      showError('Failed to download PDF');
+    } catch (err) {
+      console.error('Error downloading PDF:', err);
+      showError(err.message || 'Failed to download PDF');
     }
   };
 
@@ -191,8 +250,9 @@ const LeasePage = () => {
       await leaseService.triggerExpiredLeases();
       showSuccess('Expired leases updated successfully!');
       fetchLeases(page, statusFilter, searchTerm);
-    } catch {
-      showError('Failed to trigger expired leases');
+    } catch (err) {
+      console.error('Error triggering expired leases:', err);
+      showError(err.message || 'Failed to trigger expired leases');
     }
   };
 
@@ -209,9 +269,27 @@ const LeasePage = () => {
           colors[status] || 'bg-gray-100 text-gray-800'
         }`}
       >
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {status?.charAt(0)?.toUpperCase() + status?.slice(1) || 'Unknown'}
       </span>
     );
+  };
+
+  // Get display data safely
+  const getTenantName = (lease) => {
+    if (lease.tenant?.name) return lease.tenant.name;
+    if (lease.tenant?.first_name || lease.tenant?.last_name) {
+      return `${lease.tenant.first_name || ''} ${lease.tenant.last_name || ''}`.trim();
+    }
+    return lease.tenant_id || '-';
+  };
+
+  const getLocalReference = (lease) => {
+    return lease.local?.reference_code || lease.local?.referenceCode || 
+           lease.local?.code || lease.local_id || '-';
+  };
+
+  const getLeaseAmount = (lease) => {
+    return lease.lease_amount || lease.leaseAmount;
   };
 
   return (
@@ -257,21 +335,36 @@ const LeasePage = () => {
         </div>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <div className="text-red-600 text-sm">{error}</div>
+            <Button
+              onClick={() => setError(null)}
+              className="ml-auto text-red-600 hover:text-red-800 text-lg font-bold"
+            >
+              ×
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
         <div className="relative w-full sm:w-1/2">
           <FiSearch className="absolute left-3 top-3 text-gray-400" />
           <Input
-            placeholder="Search by tenant or local..."
+            placeholder="Search by tenant name, local reference..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="pl-10 w-full border-gray-300 rounded-lg"
+            className="pl-10 w-full border-gray-300 rounded-lg text-white"
           />
         </div>
 
         <div className="w-full sm:w-1/3">
           <Select
-            label="Filter by Status"
+            // label="Filter by Status"
             value={
               statusFilter
                 ? { value: statusFilter, label: statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1) }
@@ -293,7 +386,9 @@ const LeasePage = () => {
       {loading ? (
         <div className="p-8 text-center text-gray-500 bg-white rounded-lg">Loading leases...</div>
       ) : filteredLeases.length === 0 ? (
-        <div className="p-8 text-center text-gray-500 bg-white rounded-lg">No leases found</div>
+        <div className="p-8 text-center text-gray-500 bg-white rounded-lg">
+          {leases.length === 0 ? 'No leases found' : 'No leases match your search criteria'}
+        </div>
       ) : (
         <>
           {/* Desktop Table */}
@@ -316,13 +411,13 @@ const LeasePage = () => {
                   {filteredLeases.map(lease => (
                     <tr key={lease.id} className="hover:bg-gray-50 transition-colors">
                       <td className="p-3 font-medium text-gray-800">{lease.reference || '-'}</td>
-                      <td className="p-3 font-medium text-gray-800">{lease.tenant?.name || '-'}</td>
-                      <td className="p-3">{lease.local?.referenceCode || '-'}</td>
+                      <td className="p-3 font-medium text-gray-800">{getTenantName(lease)}</td>
+                      <td className="p-3">{getLocalReference(lease)}</td>
                       <td className="p-3">
-                        {lease.leaseAmount ? `${lease.leaseAmount.toLocaleString()} RWF` : '-'}
+                        {getLeaseAmount(lease) ? `${getLeaseAmount(lease).toLocaleString()} RWF` : '-'}
                       </td>
-                      <td className="p-3">{lease.startDate?.split('T')[0]}</td>
-                      <td className="p-3">{lease.endDate?.split('T')[0]}</td>
+                      <td className="p-3">{lease.start_date?.split('T')[0] || lease.startDate?.split('T')[0] || '-'}</td>
+                      <td className="p-3">{lease.end_date?.split('T')[0] || lease.endDate?.split('T')[0] || '-'}</td>
                       <td className="p-3">{statusBadge(lease.status)}</td>
                       <td className="p-3 flex justify-center gap-2">
                         <Button
@@ -354,9 +449,11 @@ const LeasePage = () => {
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="font-semibold text-gray-800 text-base">
-                        {lease.tenant?.name || '-'}
+                        {getTenantName(lease)}
                       </div>
-                      <div className="text-sm text-gray-500">{lease.local?.referenceCode || '-'}</div>
+                      <div className="text-sm text-gray-500">
+                        {getLocalReference(lease)}
+                      </div>
                       {lease.reference && (
                         <div className="text-xs text-gray-400">Ref: {lease.reference}</div>
                       )}
@@ -369,13 +466,14 @@ const LeasePage = () => {
                     <div>
                       <div className="text-gray-500 text-xs">Amount</div>
                       <div className="font-medium text-gray-800">
-                        {lease.leaseAmount ? `${lease.leaseAmount.toLocaleString()} RWF` : '-'}
+                        {getLeaseAmount(lease) ? `${getLeaseAmount(lease).toLocaleString()} RWF` : '-'}
                       </div>
                     </div>
                     <div>
                       <div className="text-gray-500 text-xs">Duration</div>
                       <div className="font-medium text-gray-800 text-xs">
-                        {lease.startDate?.split('T')[0]} to {lease.endDate?.split('T')[0]}
+                        {lease.start_date?.split('T')[0] || lease.startDate?.split('T')[0] || '-'} to {' '}
+                        {lease.end_date?.split('T')[0] || lease.endDate?.split('T')[0] || '-'}
                       </div>
                     </div>
                   </div>
@@ -403,36 +501,38 @@ const LeasePage = () => {
       )}
 
       {/* Pagination */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-2 px-4 py-3 border-t border-gray-100 bg-white text-sm text-gray-600 rounded-lg shadow-sm">
-        <div className="text-gray-500 mb-2 sm:mb-0">
-          Page <span className="font-medium">{page}</span> of <span className="font-medium">{totalPages}</span>
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-2 px-4 py-3 border-t border-gray-100 bg-white text-sm text-gray-600 rounded-lg shadow-sm">
+          <div className="text-gray-500 mb-2 sm:mb-0">
+            Page <span className="font-medium">{page}</span> of <span className="font-medium">{totalPages}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={() => setPage(prev => Math.max(prev - 1, 1))} 
+              disabled={page <= 1} 
+              className={`px-3 py-1 rounded-md border text-xs font-medium transition ${
+                page <= 1 
+                  ? 'text-gray-300 border-gray-200 cursor-not-allowed' 
+                  : 'text-gray-700 border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              ← Prev
+            </button>
+            <span className="px-2 text-gray-500 text-xs">{page}</span>
+            <button 
+              onClick={() => setPage(prev => Math.min(prev + 1, totalPages))} 
+              disabled={page >= totalPages} 
+              className={`px-3 py-1 rounded-md border text-xs font-medium transition ${
+                page >= totalPages 
+                  ? 'text-gray-300 border-gray-200 cursor-not-allowed' 
+                  : 'text-gray-700 border-gray-300 hover:bg-gray-100'
+              }`}
+            >
+              Next →
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <button 
-            onClick={() => setPage(prev => Math.max(prev - 1, 1))} 
-            disabled={page <= 1} 
-            className={`px-3 py-1 rounded-md border text-xs font-medium transition ${
-              page <= 1 
-                ? 'text-gray-300 border-gray-200 cursor-not-allowed' 
-                : 'text-gray-700 border-gray-300 hover:bg-gray-100'
-            }`}
-          >
-            ← Prev
-          </button>
-          <span className="px-2 text-gray-500 text-xs">{page}</span>
-          <button 
-            onClick={() => setPage(prev => Math.min(prev + 1, totalPages))} 
-            disabled={page >= totalPages} 
-            className={`px-3 py-1 rounded-md border text-xs font-medium transition ${
-              page >= totalPages 
-                ? 'text-gray-300 border-gray-200 cursor-not-allowed' 
-                : 'text-gray-700 border-gray-300 hover:bg-gray-100'
-            }`}
-          >
-            Next →
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Modal */}
       {modalOpen && (
@@ -450,18 +550,23 @@ const LeasePage = () => {
               label="Start Date"
               value={editData.startDate}
               onChange={e => setEditData({ ...editData, startDate: e.target.value })}
+              required
             />
             <Input
               type="date"
               label="End Date"
               value={editData.endDate}
               onChange={e => setEditData({ ...editData, endDate: e.target.value })}
+              required
             />
             <Input
               type="number"
               label="Lease Amount (RWF)"
               value={editData.leaseAmount}
               onChange={e => setEditData({ ...editData, leaseAmount: e.target.value })}
+              min="0"
+              step="0.01"
+              required
             />
         
             <Select
@@ -483,57 +588,60 @@ const LeasePage = () => {
               isSearchable
             />
 
-        
-              <Select
-                label="Property"
-                value={
-                  editData.propertyId
-                    ? propertiesOptions.find(p => p.value === editData.propertyId)
-                    : { value: '', label: '— Select Property —', isDisabled: true }
-                }
-                options={[
-                  { value: '', label: '— Select Property —', isDisabled: true },
-                  ...propertiesOptions,
-                ]}
-                onChange={selected => {
-                  const propertyId = selected?.value || '';
-                  setEditData({ ...editData, propertyId, localId: '' });
+            <Select
+              label="Property"
+              value={
+                editData.propertyId
+                  ? propertiesOptions.find(p => p.value === editData.propertyId)
+                  : { value: '', label: '— Select Property —', isDisabled: true }
+              }
+              options={[
+                { value: '', label: '— Select Property —', isDisabled: true },
+                ...propertiesOptions,
+              ]}
+              onChange={selected => {
+                const propertyId = selected?.value || '';
+                setEditData({ ...editData, propertyId, localId: '' });
 
-                  // Filter locals by selected property
-                  const localsForProperty = locals.filter(
-                    l => (l.property_id || l.propertyId) === propertyId
-                  );
-                  setFilteredLocals(localsForProperty);
-                }}
-                isOptionDisabled={option => option.isDisabled}
-                placeholder="Select Property..."
-                isSearchable
-              />
+                // Filter locals by selected property
+                const localsForProperty = locals.filter(l => 
+                  (l.property_id || l.propertyId) === propertyId
+                );
+                setFilteredLocals(localsForProperty);
+              }}
+              isOptionDisabled={option => option.isDisabled}
+              placeholder="Select Property..."
+              isSearchable
+            />
 
-        
-              <Select
-                label="Local"
-                value={
-                  editData.localId
-                    ? filteredLocals
-                        .map(l => ({ value: l.id, label: l.reference_code }))
-                        .find(l => l.value === editData.localId)
-                    : { value: '', label: '— Select Local —', isDisabled: true }
-                }
-                options={[
-                  { value: '', label: '— Select Local —', isDisabled: true },
-                  ...filteredLocals.map(l => ({ value: l.id, label: l.reference_code })),
-                ]}
-                onChange={selected =>
-                  setEditData({ ...editData, localId: selected?.value || '' })
-                }
-                isOptionDisabled={option => option.isDisabled}
-                placeholder={editData.propertyId ? 'Select Local...' : 'Select a property first'}
-                isDisabled={!editData.propertyId}
-                isSearchable
-              />
+            <Select
+              label="Local"
+              value={
+                editData.localId
+                  ? filteredLocals
+                      .map(l => ({ 
+                        value: l.id, 
+                        label: l.reference_code || l.referenceCode || l.code || `Local ${l.id}` 
+                      }))
+                      .find(l => l.value === editData.localId)
+                  : { value: '', label: '— Select Local —', isDisabled: true }
+              }
+              options={[
+                { value: '', label: '— Select Local —', isDisabled: true },
+                ...filteredLocals.map(l => ({ 
+                  value: l.id, 
+                  label: l.reference_code || l.referenceCode || l.code || `Local ${l.id}` 
+                })),
+              ]}
+              onChange={selected =>
+                setEditData({ ...editData, localId: selected?.value || '' })
+              }
+              isOptionDisabled={option => option.isDisabled}
+              placeholder={editData.propertyId ? 'Select Local...' : 'Select a property first'}
+              isDisabled={!editData.propertyId}
+              isSearchable
+            />
 
-        
             <Select
               label="Status"
               value={{

@@ -131,7 +131,7 @@ const leaseService = {
    */
   downloadPdfReport: async () => {
     try {
-      const res = await axios.get(`${BASE_URL}/report/pdf`, {
+      const res = await axios.get(`${BASE_URL}/leases/report/pdf`, {
         headers: authHeaders(),
         responseType: 'blob',
       });
