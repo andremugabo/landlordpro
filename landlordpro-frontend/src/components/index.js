@@ -11,4 +11,5 @@ export { default as Checkbox } from './ui/Checkbox';
 export { default as Badge } from './ui/Badge';
 export { default as Tooltip } from './ui/Tooltip';
 export { default as Alert } from './ui/Alert';
+export { default as Spinner } from './ui/Spinner';
 export { default as ExpenseForm } from './ExpenseForm';
