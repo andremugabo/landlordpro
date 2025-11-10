@@ -19,6 +19,14 @@ Local.init(
       unique: true
     },
 
+    // Virtual field - alias for reference_code to match FloorService expectations
+    local_number: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        return this.reference_code;
+      }
+    },
+
     status: {
       type: DataTypes.ENUM('available', 'occupied', 'maintenance'),
       defaultValue: 'available'
@@ -27,6 +35,22 @@ Local.init(
     size_m2: {
       type: DataTypes.FLOAT,
       allowNull: true,
+      validate: { min: 0 }
+    },
+
+    // Virtual field - alias for size_m2 to match FloorService expectations
+    area: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        return this.size_m2;
+      }
+    },
+
+    // New column for rent price
+    rent_price: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0,
       validate: { min: 0 }
     },
 

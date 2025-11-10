@@ -1,4 +1,4 @@
-// AdminDashboard.jsx
+// src/pages/AdminDashboard.jsx
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -8,7 +8,7 @@ import {
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, BarChart, Bar, CartesianGrid
+  PieChart, Pie, Cell, Legend, CartesianGrid
 } from 'recharts';
 import { Card, Button, Badge, Spinner } from '../../components';
 import { getLoggedInUser } from '../../services/AuthService';
@@ -24,6 +24,7 @@ const AdminDashboard = () => {
 
   // State
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
     properties: 0,
     floors: 0,
@@ -36,8 +37,14 @@ const AdminDashboard = () => {
   });
   
   const [recentExpenses, setRecentExpenses] = useState([]);
+  const [recentTenants, setRecentTenants] = useState([]);
   const [occupancyData, setOccupancyData] = useState(null);
-  const [timeRange, setTimeRange] = useState('month'); // week, month, year
+  const [chartData, setChartData] = useState({
+    incomeVsExpense: [],
+    expenseByCategory: [],
+    monthlyTrend: [],
+  });
+  const [timeRange, setTimeRange] = useState('month');
 
   // Fetch dashboard data
   useEffect(() => {
@@ -60,7 +67,7 @@ const AdminDashboard = () => {
         getAllProperties(1, 1000),
         getAllFloors({ limit: 1000 }),
         getAllLocals({ page: 1, limit: 1000 }),
-        getAllExpenses({ page: 1, limit: 10 }),
+        getAllExpenses({ page: 1, limit: 50 }), // Get more for chart data
         getExpenseSummary(getDateRangeFilter()),
         getAllFloorsOccupancy(),
       ]);
@@ -105,12 +112,114 @@ const AdminDashboard = () => {
       setRecentExpenses(expenses.slice(0, 5));
       setOccupancyData(occupancy);
 
+      // Generate chart data
+      generateChartData(expenses, expenseSummary);
+
+      // Mock recent tenants (replace with actual tenant service when available)
+      setRecentTenants([
+        { 
+          id: 1, 
+          name: 'John Doe', 
+          unit: 'Apt 101', 
+          leaseEnd: '2025-12-31', 
+          balance: 500,
+          status: 'active'
+        },
+        { 
+          id: 2, 
+          name: 'Jane Smith', 
+          unit: 'Apt 102', 
+          leaseEnd: '2025-11-30', 
+          balance: 0,
+          status: 'active'
+        },
+        { 
+          id: 3, 
+          name: 'Mike Johnson', 
+          unit: 'Apt 201', 
+          leaseEnd: '2026-01-15', 
+          balance: 1200,
+          status: 'overdue'
+        },
+        { 
+          id: 4, 
+          name: 'Sarah Williams', 
+          unit: 'Apt 305', 
+          leaseEnd: '2025-10-20', 
+          balance: 0,
+          status: 'active'
+        },
+        { 
+          id: 5, 
+          name: 'Robert Brown', 
+          unit: 'Apt 412', 
+          leaseEnd: '2026-03-10', 
+          balance: 750,
+          status: 'overdue'
+        },
+      ]);
+
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       showError('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Generate chart data from expenses
+  const generateChartData = (expenses, summary) => {
+    // Income vs Expense by month (last 4 months)
+    const last4Months = [];
+    const now = new Date();
+    
+    for (let i = 3; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = date.toLocaleString('default', { month: 'short' });
+      
+      // Filter expenses for this month
+      const monthExpenses = expenses.filter(exp => {
+        const expDate = new Date(exp.created_at);
+        return expDate.getMonth() === date.getMonth() && 
+               expDate.getFullYear() === date.getFullYear();
+      });
+      
+      const totalExpense = monthExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+      
+      // Mock income (in real app, get from revenue/lease service)
+      const income = totalExpense * 1.5; // Assume income is 1.5x expenses
+      
+      last4Months.push({
+        month: monthName,
+        income: Math.round(income),
+        expense: Math.round(totalExpense),
+      });
+    }
+
+    // Expense by category
+    const categoryMap = {};
+    expenses.forEach(exp => {
+      const category = exp.category || 'other';
+      categoryMap[category] = (categoryMap[category] || 0) + parseFloat(exp.amount || 0);
+    });
+
+    const expenseByCategory = Object.entries(categoryMap).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value: Math.round(value),
+    })).sort((a, b) => b.value - a.value); // Sort by value descending
+
+    setChartData({
+      incomeVsExpense: last4Months,
+      expenseByCategory,
+      monthlyTrend: last4Months,
+    });
+  };
+
+  // Refresh dashboard
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+    setRefreshing(false);
   };
 
   const getDateRangeFilter = () => {
@@ -135,11 +244,16 @@ const AdminDashboard = () => {
     }).format(amount);
   };
 
-  // Calculate percentage change (mock for now)
-  const getPercentageChange = (current, previous) => {
-    if (!previous) return 0;
-    return ((current - previous) / previous * 100).toFixed(1);
+  // Chart colors
+  const CHART_COLORS = {
+    income: '#14B8A6', // teal
+    expense: '#F87171', // red
+    occupied: '#14B8A6', // teal
+    available: '#60A5FA', // blue
+    maintenance: '#FBBF24', // yellow
   };
+
+  const PIE_COLORS = ['#14B8A6', '#60A5FA', '#FBBF24', '#F87171', '#8B5CF6', '#EC4899'];
 
   // Quick actions
   const quickActions = [
@@ -172,7 +286,7 @@ const AdminDashboard = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Spinner size="xl" />
+        <Spinner size="xl" text="Loading dashboard..." />
       </div>
     );
   }
@@ -182,7 +296,7 @@ const AdminDashboard = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">
+          <h1 className="text-3xl font-bold text-white">
             Welcome back, {user?.name || 'Admin'}! 👋
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -190,16 +304,25 @@ const AdminDashboard = () => {
           </p>
         </div>
         
-        {/* Time Range Filter */}
+        {/* Time Range Filter & Refresh */}
         <div className="flex gap-2">
+          <Button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="px-3 py-2 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white transition flex items-center gap-2"
+          >
+            <FiRefreshCw className={refreshing ? 'animate-spin' : ''} size={16} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+          
           {['week', 'month', 'year'].map((range) => (
             <Button
               key={range}
               onClick={() => setTimeRange(range)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                 timeRange === range
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                  : 'bg-red-500 hover:bg-red-600 text-white'
               }`}
             >
               {range.charAt(0).toUpperCase() + range.slice(1)}
@@ -211,24 +334,24 @@ const AdminDashboard = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Properties */}
-        <Card className="p-6 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg">
+        <Card className="p-6 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-blue-100 text-sm font-medium">Properties</p>
               <h3 className="text-3xl font-bold mt-2">{stats.properties}</h3>
               <div className="flex items-center gap-1 mt-2 text-blue-100 text-xs">
                 <FiTrendingUp size={12} />
-                <span>+5% from last month</span>
+                <span>Active properties</span>
               </div>
             </div>
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+            <div className="bg-blue-800 bg-opacity-20 p-3 rounded-lg">
               <FiHome size={24} />
             </div>
           </div>
         </Card>
 
         {/* Floors */}
-        <Card className="p-6 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl shadow-lg">
+        <Card className="p-6 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-purple-100 text-sm font-medium">Floors</p>
@@ -238,14 +361,14 @@ const AdminDashboard = () => {
                 <span>Across all properties</span>
               </div>
             </div>
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+            <div className="bg-blue-800 bg-opacity-20 p-3 rounded-lg">
               <FiLayers size={24} />
             </div>
           </div>
         </Card>
 
         {/* Locals/Units */}
-        <Card className="p-6 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg">
+        <Card className="p-6 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-green-100 text-sm font-medium">Total Units</p>
@@ -255,14 +378,14 @@ const AdminDashboard = () => {
                 <span>{Math.round((stats.locals * 0.75))} occupied</span>
               </div>
             </div>
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+            <div className="bg-blue-800 bg-opacity-20 p-3 rounded-lg">
               <FiLayers size={24} />
             </div>
           </div>
         </Card>
 
         {/* Expenses */}
-        <Card className="p-6 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl shadow-lg">
+        <Card className="p-6 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-orange-100 text-sm font-medium">Total Expenses</p>
@@ -272,7 +395,7 @@ const AdminDashboard = () => {
                 <span>This {timeRange}</span>
               </div>
             </div>
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+            <div className="bg-blue-800 bg-opacity-20 p-3 rounded-lg">
               <FiDollarSign size={24} />
             </div>
           </div>
@@ -282,7 +405,7 @@ const AdminDashboard = () => {
       {/* Financial Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Total Expenses */}
-        <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100">
+        <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-800">Total Expenses</h3>
             <FiDollarSign className="text-gray-400" size={20} />
@@ -299,7 +422,7 @@ const AdminDashboard = () => {
         </Card>
 
         {/* Paid */}
-        <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100">
+        <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-800">Paid</h3>
             <FiCheckCircle className="text-green-500" size={20} />
@@ -318,7 +441,7 @@ const AdminDashboard = () => {
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
-                className="bg-green-500 h-2 rounded-full transition-all"
+                className="bg-green-500 h-2 rounded-full transition-all duration-500"
                 style={{ 
                   width: `${stats.totalExpenseAmount > 0 
                     ? (stats.paidAmount / stats.totalExpenseAmount) * 100 
@@ -330,7 +453,7 @@ const AdminDashboard = () => {
         </Card>
 
         {/* Pending & Overdue */}
-        <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100">
+        <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-800">Outstanding</h3>
             <FiAlertCircle className="text-yellow-500" size={20} />
@@ -344,7 +467,7 @@ const AdminDashboard = () => {
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-1.5">
-                <div className="bg-yellow-500 h-1.5 rounded-full" style={{ width: '60%' }} />
+                <div className="bg-yellow-500 h-1.5 rounded-full transition-all duration-500" style={{ width: '60%' }} />
               </div>
             </div>
             <div>
@@ -355,7 +478,7 @@ const AdminDashboard = () => {
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-1.5">
-                <div className="bg-red-500 h-1.5 rounded-full" style={{ width: '40%' }} />
+                <div className="bg-red-500 h-1.5 rounded-full transition-all duration-500" style={{ width: '40%' }} />
               </div>
             </div>
           </div>
@@ -366,7 +489,10 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
         <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <FiPlusCircle className="text-blue-500" />
+            Quick Actions
+          </h3>
           <div className="space-y-3">
             {quickActions.map((action, index) => {
               const Icon = action.icon;
@@ -374,7 +500,7 @@ const AdminDashboard = () => {
                 <button
                   key={index}
                   onClick={action.onClick}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition hover:scale-105 ${
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition hover:scale-105 active:scale-95 ${
                     action.color === 'blue' ? 'border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700' :
                     action.color === 'green' ? 'border-green-200 bg-green-50 hover:bg-green-100 text-green-700' :
                     action.color === 'purple' ? 'border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700' :
@@ -395,7 +521,7 @@ const AdminDashboard = () => {
             <h3 className="text-lg font-semibold text-gray-800">Recent Expenses</h3>
             <button
               onClick={() => navigate('/expenses')}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium transition"
             >
               View All →
             </button>
@@ -445,65 +571,287 @@ const AdminDashboard = () => {
         </Card>
       </div>
 
-      {/* Occupancy Overview */}
-      {occupancyData && (
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Income vs Expenses Line Chart */}
         <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">Occupancy Overview</h3>
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <FiTrendingUp className="text-teal-500" />
+              Income vs Expenses
+            </h3>
+          </div>
+          {chartData.incomeVsExpense.length === 0 ? (
+            <div className="flex items-center justify-center h-64 text-gray-400">
+              <div className="text-center">
+                <FiActivity size={48} className="mx-auto mb-2" />
+                <p>No data available</p>
+              </div>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={chartData.incomeVsExpense}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis 
+                  dataKey="month" 
+                  stroke="#9CA3AF"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis 
+                  stroke="#9CA3AF"
+                  style={{ fontSize: '12px' }}
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                  }}
+                  formatter={(value) => formatCurrency(value)}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="income" 
+                  stroke={CHART_COLORS.income} 
+                  strokeWidth={3}
+                  dot={{ fill: CHART_COLORS.income, r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="expense" 
+                  stroke={CHART_COLORS.expense} 
+                  strokeWidth={3}
+                  dot={{ fill: CHART_COLORS.expense, r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </Card>
+
+        {/* Expense by Category Pie Chart */}
+        <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <FiActivity className="text-purple-500" />
+              Expenses by Category
+            </h3>
+          </div>
+          {chartData.expenseByCategory.length === 0 ? (
+            <div className="flex items-center justify-center h-64 text-gray-400">
+              <div className="text-center">
+                <FiActivity size={48} className="mx-auto mb-2" />
+                <p>No data available</p>
+              </div>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={chartData.expenseByCategory}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={{ stroke: '#9CA3AF', strokeWidth: 1 }}
+                >
+                  {chartData.expenseByCategory.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={PIE_COLORS[index % PIE_COLORS.length]} 
+                      stroke="#fff" 
+                      strokeWidth={2} 
+                    />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                  }}
+                  formatter={(value) => formatCurrency(value)}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </Card>
+      </div>
+
+      {/* Occupancy Rate Chart */}
+      {occupancyData && (
+        <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <FiHome className="text-blue-500" />
+                Occupancy Overview
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">Current status of all properties</p>
+            </div>
             <button
               onClick={() => navigate('/reports/occupancy')}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium transition"
             >
               View Details →
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <FiCheckCircle className="text-green-600" />
-                <span className="text-sm font-medium text-green-800">Occupied</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Occupancy Stats */}
+            <div className="grid grid-cols-1 gap-4">
+              <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <FiCheckCircle className="text-green-600" size={20} />
+                  <span className="text-sm font-medium text-green-800">Occupied</span>
+                </div>
+                <div className="text-3xl font-bold text-green-900">
+                  {occupancyData?.occupied || 0}
+                </div>
+                <div className="text-xs text-green-700 mt-1">
+                  {occupancyData?.occupancyRate || 0}% occupancy rate
+                </div>
               </div>
-              <div className="text-2xl font-bold text-green-900">
-                {occupancyData?.occupied || 0}
+
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <FiActivity className="text-blue-600" size={20} />
+                  <span className="text-sm font-medium text-blue-800">Available</span>
+                </div>
+                <div className="text-3xl font-bold text-blue-900">
+                  {occupancyData?.available || 0}
+                </div>
+                <div className="text-xs text-blue-700 mt-1">
+                  Ready for rent
+                </div>
               </div>
-              <div className="text-xs text-green-700 mt-1">
-                {occupancyData?.occupancyRate || 0}% occupancy
+
+              <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <FiClock className="text-yellow-600" size={20} />
+                  <span className="text-sm font-medium text-yellow-800">Maintenance</span>
+                </div>
+                <div className="text-3xl font-bold text-yellow-900">
+                  {occupancyData?.maintenance || 0}
+                </div>
+                <div className="text-xs text-yellow-700 mt-1">
+                  Under maintenance
+                </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <FiActivity className="text-blue-600" />
-                <span className="text-sm font-medium text-blue-800">Available</span>
-              </div>
-              <div className="text-2xl font-bold text-blue-900">
-                {occupancyData?.available || 0}
-              </div>
-              <div className="text-xs text-blue-700 mt-1">
-                Ready for rent
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <FiClock className="text-yellow-600" />
-                <span className="text-sm font-medium text-yellow-800">Maintenance</span>
-              </div>
-              <div className="text-2xl font-bold text-yellow-900">
-                {occupancyData?.maintenance || 0}
-              </div>
-              <div className="text-xs text-yellow-700 mt-1">
-                Under maintenance
-              </div>
+            {/* Occupancy Pie Chart */}
+            <div className="flex items-center justify-center">
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Occupied', value: occupancyData?.occupied || 0 },
+                      { name: 'Available', value: occupancyData?.available || 0 },
+                      { name: 'Maintenance', value: occupancyData?.maintenance || 0 },
+                    ]}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    <Cell fill={CHART_COLORS.occupied} stroke="#fff" strokeWidth={2} />
+                    <Cell fill={CHART_COLORS.available} stroke="#fff" strokeWidth={2} />
+                    <Cell fill={CHART_COLORS.maintenance} stroke="#fff" strokeWidth={2} />
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </Card>
       )}
 
+      {/* Recent Tenants Table */}
+      <Card className="p-6 bg-white rounded-xl shadow-md border border-gray-100">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <FiUsers className="text-indigo-500" />
+            Recent Tenants
+          </h3>
+          <button
+            onClick={() => navigate('/tenants')}
+            className="text-sm text-blue-600 hover:text-blue-700 font-medium transition"
+          >
+            View All →
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="p-3 font-semibold text-gray-700">Name</th>
+                <th className="p-3 font-semibold text-gray-700">Unit</th>
+                <th className="p-3 font-semibold text-gray-700">Lease End</th>
+                <th className="p-3 font-semibold text-gray-700">Balance</th>
+                <th className="p-3 font-semibold text-gray-700">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentTenants.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="p-8 text-center text-gray-500">
+                    <FiUsers size={48} className="mx-auto mb-2 text-gray-300" />
+                    <p>No tenants found</p>
+                  </td>
+                </tr>
+              ) : (
+                recentTenants.map((tenant) => (
+                  <tr 
+                    key={tenant.id} 
+                    className="hover:bg-gray-50 transition border-b border-gray-100 cursor-pointer"
+                    onClick={() => navigate(`/tenants/${tenant.id}`)}
+                  >
+                    <td className="p-3 font-medium text-gray-800">{tenant.name}</td>
+                    <td className="p-3 text-gray-600">{tenant.unit}</td>
+                    <td className="p-3 text-gray-600">
+                      {new Date(tenant.leaseEnd).toLocaleDateString()}
+                    </td>
+                    <td className={`p-3 font-semibold ${
+                      tenant.balance > 0 ? 'text-red-600' : 'text-green-600'
+                    }`}>
+                      {formatCurrency(tenant.balance)}
+                    </td>
+                    <td className="p-3">
+                      {tenant.balance > 0 ? (
+                        <Badge className="bg-red-100 text-red-800" text="Overdue" />
+                      ) : (
+                        <Badge className="bg-green-100 text-green-800" text="Paid" />
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       {/* System Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+        <Card className="p-4 bg-white rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3">
             <div className="bg-blue-100 p-2 rounded-lg">
               <FiActivity className="text-blue-600" size={20} />
@@ -515,19 +863,19 @@ const AdminDashboard = () => {
           </div>
         </Card>
 
-        <Card className="p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+        <Card className="p-4 bg-white rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3">
             <div className="bg-green-100 p-2 rounded-lg">
               <FiUsers className="text-green-600" size={20} />
             </div>
             <div>
               <p className="text-sm text-gray-500">Active Users</p>
-              <p className="font-semibold text-gray-800">{user ? 1 : 0} Online</p>
+              <p className="font-semibold text-gray-800">{user ? '1' : '0'} Online</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+        <Card className="p-4 bg-white rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3">
             <div className="bg-purple-100 p-2 rounded-lg">
               <FiCalendar className="text-purple-600" size={20} />

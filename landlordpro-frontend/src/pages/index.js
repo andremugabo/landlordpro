@@ -5,7 +5,7 @@ export { default as ResetPassword } from './authPages/ResetPassword'
 export { default as ProfilePage } from './authPages/ProfilePage'
 
 // Admin pages
-export { default as AdminDashboard } from './adminPages/adminDashboard'
+export { default as AdminDashboard } from './adminPages/AdminDashboard'
 export { default as AdminUsersPage } from './adminPages/AdminUsersPage'
 export { default as PropertyPage } from './adminPages/PropertyPage'
 export { default as PropertyFloorsPage } from './adminPages/PropertyFloorsPage'

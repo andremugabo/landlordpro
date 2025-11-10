@@ -604,12 +604,7 @@ const ExpensePage = () => {
               <div className="text-xs sm:text-sm text-gray-500 mt-1">Overdue</div>
             </Card>
             
-            <Card className="p-3 sm:p-4 bg-white rounded-lg shadow-sm border">
-              <div className="text-lg sm:text-xl md:text-2xl font-bold text-red-600 truncate">
-                {formatCurrency(summary.totalWithVat || 0)}
-              </div>
-              <div className="text-xs sm:text-sm text-gray-500 mt-1">Total With VAT</div>
-            </Card>
+            
           </div>
         )}
 

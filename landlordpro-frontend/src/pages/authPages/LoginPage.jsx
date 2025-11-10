@@ -104,7 +104,7 @@ const Login = () => {
                 {...register('email')}
                 error={errors.email?.message}
                 aria-invalid={!!errors.email}
-                className="w-full transition-all duration-200 focus:scale-[1.01]"
+                className="w-full transition-all duration-200 focus:scale-[1.01] text-white"
               />
             </div>
 
@@ -117,7 +117,7 @@ const Login = () => {
                 {...register('password')}
                 error={errors.password?.message}
                 aria-invalid={!!errors.password}
-                className="w-full pr-12 transition-all duration-200 focus:scale-[1.01]"
+                className="w-full pr-12 transition-all duration-200 focus:scale-[1.01] text-white"
               />
               <button
                 type="button"

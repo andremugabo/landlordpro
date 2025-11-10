@@ -56,7 +56,7 @@ const ResetPassword = () => {
                 {...register('password')}
                 error={errors.password?.message}
                 aria-invalid={!!errors.password}
-                className="w-full"
+                className="w-full text-white"
               />
               <button
                 type="button"
@@ -75,7 +75,7 @@ const ResetPassword = () => {
               {...register('confirmPassword')}
               error={errors.confirmPassword?.message}
               aria-invalid={!!errors.confirmPassword}
-              className="w-full"
+              className="w-full text-white"
             />
 
             <Button type="submit" variant="primary" disabled={isSubmitting} className="w-full">

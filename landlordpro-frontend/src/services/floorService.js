@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // ✅ Base URL fallback if env variable is missing
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000') + '/api/floors';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL) + '/api/floors';
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -141,8 +141,16 @@ export const getFloorOccupancy = async (id) => {
 
 // Helper to extract floors data from response
 export const extractFloorsData = (response) => {
-  return response?.data || [];
+  if (!response) return [];
+
+  if (Array.isArray(response)) return response;        
+  if (Array.isArray(response.data)) return response.data;
+  if (Array.isArray(response.floors)) return response.floors; 
+
+  // fallback
+  return [];
 };
+
 
 // Helper to check if response is filtered by property
 export const isFilteredByProperty = (response) => {

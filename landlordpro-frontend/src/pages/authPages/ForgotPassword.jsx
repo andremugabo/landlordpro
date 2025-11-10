@@ -60,7 +60,7 @@ const ForgotPassword = () => {
               {...register('email')}
               error={errors.email?.message}
               aria-invalid={!!errors.email}
-              className="w-full"
+              className="w-full text-white"
             />
 
             <Button

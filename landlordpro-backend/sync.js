@@ -1,14 +1,14 @@
 const sequelize = require('./db');
-const models = require('./src/models'); // make sure this points to your index.js with all models
+const models = require('./src/models'); 
 
 (async () => {
   try {
-    console.log('⚡ Dropping and recreating all tables...');
+    console.log('⚡ Syncing database schema...');
 
-    // Drops all tables and recreates them from scratch
-    await sequelize.sync({ force: true });
+    // Update tables to match models without dropping data
+    await sequelize.sync({ alter: true });
 
-    console.log('✅ Database schema recreated successfully!');
+    console.log('✅ Database schema synced successfully!');
     process.exit(0); // exit after successful sync
   } catch (err) {
     console.error('❌ Sync error:', err);

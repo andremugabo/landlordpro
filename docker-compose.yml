@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: landlordpro-postgres
+    environment:
+      - POSTGRES_DB=landlordpro_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - landlordpro-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./landlordpro-backend
+      dockerfile: Dockerfile
+    container_name: landlordpro-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=postgres
+    env_file:
+      - ./landlordpro-backend/.env
+    volumes:
+      - ./landlordpro-backend/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - landlordpro-network
+
+  frontend:
+    build:
+      context: ./landlordpro-frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://localhost:3000
+    container_name: landlordpro-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - landlordpro-network
+
+networks:
+  landlordpro-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  uploads:
