@@ -33,7 +33,7 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-tl from-green-50 to-teal-50 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-tl from-green-50 to-teal-50 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="w-full max-w-md mx-auto animate-fade-in">
         {/* Header */}
         <div className="text-center mb-6 px-4 sm:px-0">

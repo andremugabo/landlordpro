@@ -319,7 +319,7 @@ const PaymentPage = () => {
             <div className="hidden md:block overflow-x-auto">
               <Card className="bg-white rounded-xl shadow-md border border-gray-100">
                 <table className="min-w-full text-sm text-gray-700">
-                  <thead className="bg-gradient-to-r from-blue-100 to-indigo-100 border-b border-gray-200 text-gray-600 text-xs uppercase">
+                  <thead className="bg-linear-to-r from-blue-100 to-indigo-100 border-b border-gray-200 text-gray-600 text-xs uppercase">
                     <tr>
                       <th className="p-3 text-left font-semibold">Invoice</th>
                       <th className="p-3 text-left font-semibold">Amount</th>

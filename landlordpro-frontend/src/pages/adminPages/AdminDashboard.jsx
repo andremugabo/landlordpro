@@ -334,7 +334,7 @@ const AdminDashboard = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Properties */}
-        <Card className="p-6 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="p-6 bg-linear-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-blue-100 text-sm font-medium">Properties</p>
@@ -351,7 +351,7 @@ const AdminDashboard = () => {
         </Card>
 
         {/* Floors */}
-        <Card className="p-6 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="p-6 bg-linear-to-br from-purple-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-purple-100 text-sm font-medium">Floors</p>
@@ -368,7 +368,7 @@ const AdminDashboard = () => {
         </Card>
 
         {/* Locals/Units */}
-        <Card className="p-6 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="p-6 bg-linear-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-green-100 text-sm font-medium">Total Units</p>
@@ -385,7 +385,7 @@ const AdminDashboard = () => {
         </Card>
 
         {/* Expenses */}
-        <Card className="p-6 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="p-6 bg-linear-to-br from-orange-500 to-orange-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-orange-100 text-sm font-medium">Total Expenses</p>
@@ -707,7 +707,7 @@ const AdminDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Occupancy Stats */}
             <div className="grid grid-cols-1 gap-4">
-              <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+              <div className="bg-linear-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
                 <div className="flex items-center gap-2 mb-2">
                   <FiCheckCircle className="text-green-600" size={20} />
                   <span className="text-sm font-medium text-green-800">Occupied</span>
@@ -720,7 +720,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+              <div className="bg-linear-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
                 <div className="flex items-center gap-2 mb-2">
                   <FiActivity className="text-blue-600" size={20} />
                   <span className="text-sm font-medium text-blue-800">Available</span>
@@ -733,7 +733,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
+              <div className="bg-linear-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
                 <div className="flex items-center gap-2 mb-2">
                   <FiClock className="text-yellow-600" size={20} />
                   <span className="text-sm font-medium text-yellow-800">Maintenance</span>

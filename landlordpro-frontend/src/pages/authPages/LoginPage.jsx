@@ -60,7 +60,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 px-4 py-8">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-teal-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 px-4 py-8">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-200/30 dark:bg-teal-500/10 rounded-full blur-3xl"></div>
@@ -70,10 +70,10 @@ const Login = () => {
       <div className="w-full max-w-md relative z-10">
         {/* Logo & Header */}
         <div className="text-center mb-8 animate-fade-in">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-teal-600 to-cyan-600 dark:from-teal-500 dark:to-cyan-500 rounded-2xl shadow-lg mb-4 transform hover:scale-105 transition-transform duration-300">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-linear-to-br from-teal-600 to-cyan-600 dark:from-teal-500 dark:to-cyan-500 rounded-2xl shadow-lg mb-4 transform hover:scale-105 transition-transform duration-300">
             <ShieldCheck className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-teal-700 to-cyan-600 dark:from-teal-300 dark:to-cyan-300 bg-clip-text text-transparent mb-2">
+          <h1 className="text-4xl font-bold bg-linear-to-r from-teal-700 to-cyan-600 dark:from-teal-300 dark:to-cyan-300 bg-clip-text text-transparent mb-2">
             LandlordPro
           </h1>
           <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">
@@ -153,7 +153,7 @@ const Login = () => {
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="w-full h-12 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 dark:from-teal-500 dark:to-cyan-500 dark:hover:from-teal-600 dark:hover:to-cyan-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className="w-full h-12 bg-linear-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 dark:from-teal-500 dark:to-cyan-500 dark:hover:from-teal-600 dark:hover:to-cyan-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center space-x-2">
