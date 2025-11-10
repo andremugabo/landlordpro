@@ -360,7 +360,7 @@ const ExpenseForm = ({ editData, setEditData, properties, locals, onSubmit, subm
         </div>
 
         {editData.amount && editData.vatAmount && (
-          <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200 space-y-2">
+          <div className="bg-linear-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200 space-y-2">
             <p className="text-sm text-gray-700 flex justify-between">
               <span className="font-medium">Base Amount (excl. VAT):</span>
               <span className="font-bold text-gray-900">
@@ -684,7 +684,7 @@ const ExpenseForm = ({ editData, setEditData, properties, locals, onSubmit, subm
           className={`w-full py-3 rounded-lg font-semibold text-base transition-all shadow-md ${
             submitLoading || isDisabled
               ? 'bg-gray-400 cursor-not-allowed opacity-60'
-              : 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white transform hover:scale-[1.02]'
+              : 'bg-linear-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white transform hover:scale-[1.02]'
           }`}
         >
           {submitLoading ? (

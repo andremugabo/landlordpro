@@ -4,7 +4,7 @@ import { Footer, Header } from '../components';
 
 const AuthLayouts = () => {
   return (
-    <div className="w-full min-h-screen bg-gradient-to-tl  to-teal-50 p-4 dark:from-gray-900 dark:to-gray-800">
+    <div className="w-full min-h-screen bg-linear-to-tl  to-teal-50 p-4 dark:from-gray-900 dark:to-gray-800">
          <Outlet />
     </div>
   );
