@@ -43,7 +43,7 @@ const Alert = ({
   return (
     <div className={`${style.bg} ${style.border} border rounded-lg p-4 ${className}`}>
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0">{style.icon}</div>
+        <div className="shrink-0">{style.icon}</div>
         <div className="flex-1">
           {title && (
             <h3 className={`font-semibold ${style.text} mb-1`}>{title}</h3>
@@ -53,7 +53,7 @@ const Alert = ({
         {onClose && (
           <button
             onClick={onClose}
-            className={`flex-shrink-0 ${style.text} hover:opacity-70`}
+            className={`shrink-0 ${style.text} hover:opacity-70`}
           >
             <FiXCircle size={20} />
           </button>
