@@ -14,6 +14,8 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiX,
+  FiChevronLeft,
+  FiChevronRight,
 } from 'react-icons/fi';
 import { showError, showSuccess } from '../../utils/toastHelper';
 
@@ -28,6 +30,10 @@ const Documents = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [proofUrl, setProofUrl] = useState('');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,28 +55,40 @@ const Documents = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ✅ ENHANCED Helper to get full proof URL for payments
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterProperty, filterStatus, dateFrom, dateTo, activeTab]);
+
+  // Helper to escape HTML
+  const escapeHtml = (text) => {
+    if (!text) return '';
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return String(text).replace(/[&<>"']/g, m => map[m]);
+  };
+
+  // Helper to get full proof URL for payments
   const getFullPaymentProofUrl = (payment) => {
     if (!payment) return null;
 
-    // Check multiple possible proof field names
     const proofField = payment.proof || payment.proofUrl || payment.proofFilename || payment.attachment || payment.proof_url;
     
-    if (!proofField) {
-      return null;
-    }
+    if (!proofField) return null;
     
-    // If it's already a full URL, return as is
     if (typeof proofField === 'string' && proofField.startsWith('http')) {
       return proofField;
     }
     
-    // If it's a relative path starting with /uploads
     if (typeof proofField === 'string' && proofField.startsWith('/uploads')) {
       return `${import.meta.env.VITE_API_BASE_URL}${proofField}`;
     }
     
-    // If it's just a filename, construct the full URL
     if (payment.id && typeof proofField === 'string') {
       try {
         return getPaymentProofUrl(payment.id, proofField);
@@ -83,40 +101,27 @@ const Documents = () => {
     return null;
   };
 
-  // ✅ Helper to get full proof URL for expenses
+  // Helper to get full proof URL for expenses
   const getFullExpenseProofUrl = (expense) => {
     if (!expense || !expense.proof) return null;
     
-    // If it's already a full URL, return as is
     if (expense.proof.startsWith('http')) {
       return expense.proof;
     }
     
-    // If it's a relative path starting with /uploads
     if (expense.proof.startsWith('/uploads')) {
       return `${import.meta.env.VITE_API_BASE_URL}${expense.proof}`;
     }
     
-    // Default fallback - construct URL
     return `${import.meta.env.VITE_API_BASE_URL}/api/expenses/${expense.id}/proof/${expense.proof}`;
   };
 
-  // ✅ Enhanced payment fetch to debug proof data
+  // Fetch payments
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
       const data = await getAllPayments(searchTerm);
       let filteredData = Array.isArray(data) ? data : [];
-
-      // Debug: Check payment proof data
-      console.log('Payment data received:', filteredData.map(p => ({
-        id: p.id,
-        hasProof: !!(p.proof || p.proofUrl || p.proofFilename || p.attachment),
-        proof: p.proof,
-        proofUrl: p.proofUrl,
-        proofFilename: p.proofFilename,
-        attachment: p.attachment
-      })));
 
       if (dateFrom) {
         filteredData = filteredData.filter(p => new Date(p.startDate) >= new Date(dateFrom));
@@ -140,7 +145,7 @@ const Documents = () => {
     try {
       const res = await getAllExpenses({
         page: 1,
-        limit: 100,
+        limit: 1000,
         propertyId: filterProperty,
         search: searchTerm,
       });
@@ -188,7 +193,7 @@ const Documents = () => {
     }
   }, [activeTab, fetchExpenses, fetchPayments]);
 
-  // ✅ Proof modal handler with error handling
+  // Proof modal handler
   const handleViewProof = (url) => {
     if (!url) {
       showError('No proof available for this document');
@@ -198,48 +203,54 @@ const Documents = () => {
     setProofModalOpen(true);
   };
 
-  // Print and download helpers - KEEPING YOUR ORIGINAL STYLING
+  // ✅ FIXED: Invoice generator with correct VAT calculation
   const generateExpenseInvoice = (expense) => {
     const property = properties.find(p => p.id === expense.property_id);
-    const total = parseFloat(expense.amount || 0) + parseFloat(expense.vat_amount || 0);
+    
+    // NEW VAT CALCULATION: amount already includes VAT
+    const total = parseFloat(expense.amount || 0);
+    const vatAmount = total - (total / 1.18); // Extract 18% VAT
+    const subtotal = total - vatAmount; // Amount without VAT
     
     return `
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
       <head>
         <meta charset="UTF-8">
-        <title>Expense Invoice - ${expense.reference_number || expense.id}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Expense Invoice - ${escapeHtml(expense.reference_number || expense.id)}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: Arial, sans-serif; padding: 40px; background: #f5f5f5; }
-          .invoice-container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-          .header { display: flex; justify-content: space-between; align-items: start; border-bottom: 3px solid #10b981; padding-bottom: 20px; margin-bottom: 30px; }
-          .company-info h1 { color: #10b981; font-size: 28px; margin-bottom: 5px; }
-          .company-info p { color: #666; font-size: 14px; }
-          .invoice-info { text-align: right; }
-          .invoice-info h2 { color: #333; font-size: 24px; margin-bottom: 10px; }
-          .invoice-info p { color: #666; font-size: 14px; line-height: 1.6; }
-          .status-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+          .invoice-container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 8px; }
+          .header { display: flex; justify-content: space-between; align-items: start; border-bottom: 3px solid #10b981; padding-bottom: 20px; margin-bottom: 30px; flex-wrap: wrap; gap: 20px; }
+          .company-info h1 { color: #10b981; font-size: 28px; margin-bottom: 5px; font-weight: 700; }
+          .company-info p { color: #666; font-size: 14px; margin: 2px 0; }
+          .invoice-info { text-align: right; min-width: 250px; }
+          .invoice-info h2 { color: #333; font-size: 24px; margin-bottom: 10px; font-weight: 700; }
+          .invoice-info p { color: #666; font-size: 14px; line-height: 1.8; margin: 4px 0; }
+          .status-badge { display: inline-block; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
           .status-paid { background: #d1fae5; color: #065f46; }
           .status-pending { background: #fef3c7; color: #92400e; }
           .status-overdue { background: #fee2e2; color: #991b1b; }
-          .details { display: flex; justify-content: space-between; margin-bottom: 40px; }
-          .details-section h3 { color: #333; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
-          .details-section p { color: #666; font-size: 13px; line-height: 1.8; }
+          .details { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 30px; margin-bottom: 40px; padding: 20px; background: #f9fafb; border-radius: 6px; }
+          .details-section h3 { color: #10b981; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+          .details-section p { color: #666; font-size: 14px; line-height: 1.8; margin: 2px 0; }
           table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
           thead { background: #f9fafb; }
-          th { text-align: left; padding: 12px; font-size: 13px; color: #374151; border-bottom: 2px solid #e5e7eb; }
-          td { padding: 12px; font-size: 14px; color: #666; border-bottom: 1px solid #e5e7eb; }
+          th { text-align: left; padding: 14px 12px; font-size: 13px; color: #374151; border-bottom: 2px solid #e5e7eb; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+          td { padding: 14px 12px; font-size: 14px; color: #666; border-bottom: 1px solid #e5e7eb; }
           .text-right { text-align: right; }
-          .totals { margin-left: auto; width: 300px; }
-          .totals tr td { padding: 8px 12px; }
-          .totals tr:last-child { border-top: 2px solid #10b981; font-weight: bold; font-size: 16px; }
-          .totals tr:last-child td { color: #10b981; }
-          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #999; font-size: 12px; }
-          .notes { background: #f9fafb; padding: 15px; border-left: 3px solid #10b981; margin: 20px 0; }
-          .notes h4 { color: #333; font-size: 14px; margin-bottom: 8px; }
-          .notes p { color: #666; font-size: 13px; line-height: 1.6; }
-          @media print { body { padding: 0; background: white; } .invoice-container { box-shadow: none; } }
+          .totals { margin-left: auto; width: 350px; margin-top: 20px; }
+          .totals tr td { padding: 10px 12px; font-size: 15px; }
+          .totals tr:last-child { border-top: 2px solid #10b981; font-weight: 700; font-size: 18px; }
+          .totals tr:last-child td { color: #10b981; padding-top: 15px; }
+          .notes { background: #f0fdf4; padding: 20px; border-left: 4px solid #10b981; margin: 30px 0; border-radius: 4px; }
+          .notes h4 { color: #333; font-size: 14px; margin-bottom: 10px; font-weight: 600; }
+          .notes p { color: #666; font-size: 14px; line-height: 1.8; }
+          .footer { margin-top: 50px; padding-top: 20px; border-top: 2px solid #e5e7eb; text-align: center; color: #999; font-size: 12px; }
+          @media print { body { padding: 0; background: white; } .invoice-container { box-shadow: none; border-radius: 0; } }
+          @media (max-width: 768px) { body { padding: 20px; } .invoice-container { padding: 20px; } .header { flex-direction: column; } .invoice-info { text-align: left; } .details { grid-template-columns: 1fr; } .totals { width: 100%; } }
         </style>
       </head>
       <body>
@@ -251,12 +262,12 @@ const Documents = () => {
             </div>
             <div class="invoice-info">
               <h2>EXPENSE INVOICE</h2>
-              <p><strong>Invoice #:</strong> ${expense.reference_number || expense.id?.substring(0, 8) || 'N/A'}</p>
+              <p><strong>Invoice #:</strong> ${escapeHtml(expense.reference_number || expense.id?.substring(0, 8) || 'N/A')}</p>
               <p><strong>Date:</strong> ${expense.date ? new Date(expense.date).toLocaleDateString() : 'N/A'}</p>
               ${expense.due_date ? `<p><strong>Due Date:</strong> ${new Date(expense.due_date).toLocaleDateString()}</p>` : ''}
-              <p style="margin-top: 10px;">
+              <p style="margin-top: 12px;">
                 <span class="status-badge status-${expense.payment_status || 'pending'}">
-                  ${(expense.payment_status || 'pending').toUpperCase()}
+                  ${escapeHtml((expense.payment_status || 'pending').toUpperCase())}
                 </span>
               </p>
             </div>
@@ -264,13 +275,18 @@ const Documents = () => {
 
           <div class="details">
             <div class="details-section">
-              <h3>PROPERTY:</h3>
-              <p>${property?.name || 'N/A'}<br>${property?.address || ''}</p>
+              <h3>Property</h3>
+              ${property ? `
+                <p><strong>${escapeHtml(property.name)}</strong></p>
+                ${property.address ? `<p>${escapeHtml(property.address)}</p>` : ''}
+              ` : '<p>No property information</p>'}
             </div>
+            
             ${expense.vendor_name ? `
             <div class="details-section">
-              <h3>VENDOR:</h3>
-              <p>${expense.vendor_name}<br>${expense.vendor_contact || ''}</p>
+              <h3>Vendor</h3>
+              <p><strong>${escapeHtml(expense.vendor_name)}</strong></p>
+              ${expense.vendor_contact ? `<p>${escapeHtml(expense.vendor_contact)}</p>` : ''}
             </div>
             ` : ''}
           </div>
@@ -285,39 +301,40 @@ const Documents = () => {
             </thead>
             <tbody>
               <tr>
-                <td>${expense.description || 'Expense'}</td>
-                <td>${expense.category || 'N/A'}</td>
-                <td class="text-right">${expense.currency || 'FRW'} ${parseFloat(expense.amount || 0).toLocaleString()}</td>
+                <td>${escapeHtml(expense.description || 'Expense')}</td>
+                <td>${escapeHtml(expense.category || 'Uncategorized')}</td>
+                <td class="text-right">${expense.currency || 'FRW'} ${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             </tbody>
           </table>
 
           <table class="totals">
             <tr>
-              <td>Subtotal:</td>
-              <td class="text-right">${expense.currency || 'FRW'} ${parseFloat(expense.amount || 0).toLocaleString()}</td>
+              <td>Subtotal (Excl. VAT):</td>
+              <td class="text-right">${expense.currency || 'FRW'} ${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
-            ${expense.vat_rate ? `
             <tr>
-              <td>VAT (${expense.vat_rate}%):</td>
-              <td class="text-right">${expense.currency || 'FRW'} ${parseFloat(expense.vat_amount || 0).toLocaleString()}</td>
+              <td>VAT (18%):</td>
+              <td class="text-right">${expense.currency || 'FRW'} ${vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
-            ` : ''}
             <tr>
-              <td>TOTAL:</td>
-              <td class="text-right">${expense.currency || 'FRW'} ${total.toLocaleString()}</td>
+              <td>TOTAL (Incl. VAT):</td>
+              <td class="text-right">${expense.currency || 'FRW'} ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
           </table>
 
           ${expense.notes ? `
           <div class="notes">
             <h4>Notes</h4>
-            <p>${expense.notes}</p>
+            <p>${escapeHtml(expense.notes)}</p>
           </div>
           ` : ''}
 
           <div class="footer">
             <p>Generated on ${new Date().toLocaleString()}</p>
+            <p style="margin-top: 10px; font-size: 11px; color: #bbb;">
+              This is a computer-generated document. No signature is required.
+            </p>
           </div>
         </div>
       </body>
@@ -328,20 +345,21 @@ const Documents = () => {
   const generatePaymentReceipt = (payment) => {
     return `
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
       <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Payment Receipt - ${payment.id}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: Arial, sans-serif; padding: 40px; background: #f5f5f5; }
-          .receipt-container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-          .header { display: flex; justify-content: space-between; align-items: start; border-bottom: 3px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; }
-          .company-info h1 { color: #3b82f6; font-size: 28px; margin-bottom: 5px; }
+          .receipt-container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 8px; }
+          .header { display: flex; justify-content: space-between; align-items: start; border-bottom: 3px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; flex-wrap: wrap; gap: 20px; }
+          .company-info h1 { color: #3b82f6; font-size: 28px; margin-bottom: 5px; font-weight: 700; }
           .company-info p { color: #666; font-size: 14px; }
-          .receipt-info { text-align: right; }
-          .receipt-info h2 { color: #333; font-size: 24px; margin-bottom: 10px; }
-          .receipt-info p { color: #666; font-size: 14px; line-height: 1.6; }
+          .receipt-info { text-align: right; min-width: 250px; }
+          .receipt-info h2 { color: #333; font-size: 24px; margin-bottom: 10px; font-weight: 700; }
+          .receipt-info p { color: #666; font-size: 14px; line-height: 1.8; }
           .details { background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
           .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
           .detail-row:last-child { border-bottom: none; }
@@ -350,8 +368,8 @@ const Documents = () => {
           .amount-box { background: #3b82f6; color: white; padding: 20px; text-align: center; border-radius: 8px; margin: 30px 0; }
           .amount-box p { font-size: 14px; margin-bottom: 10px; opacity: 0.9; }
           .amount-box h3 { font-size: 36px; font-weight: bold; }
-          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #999; font-size: 12px; }
-          @media print { body { padding: 0; background: white; } .receipt-container { box-shadow: none; } }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #e5e7eb; text-align: center; color: #999; font-size: 12px; }
+          @media print { body { padding: 0; background: white; } .receipt-container { box-shadow: none; border-radius: 0; } }
         </style>
       </head>
       <body>
@@ -370,7 +388,7 @@ const Documents = () => {
 
           <div class="amount-box">
             <p>Amount Paid</p>
-            <h3>FRW ${parseFloat(payment.amount || 0).toLocaleString()}</h3>
+            <h3>FRW ${parseFloat(payment.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
           </div>
 
           <div class="details">
@@ -395,6 +413,9 @@ const Documents = () => {
           <div class="footer">
             <p>Thank you for your payment!</p>
             <p>Generated on ${new Date().toLocaleString()}</p>
+            <p style="margin-top: 10px; font-size: 11px; color: #bbb;">
+              This is a computer-generated document. No signature is required.
+            </p>
           </div>
         </div>
       </body>
@@ -443,7 +464,7 @@ const Documents = () => {
   };
 
   const toggleSelectAll = () => {
-    const items = activeTab === 'expenses' ? expenses : payments;
+    const items = paginatedItems;
     if (selectedItems.length === items.length && items.length > 0) {
       setSelectedItems([]);
     } else {
@@ -464,15 +485,22 @@ const Documents = () => {
     { value: 'overdue', label: 'Overdue' },
   ];
 
+  const itemsPerPageOptions = [
+    { value: 10, label: '10 per page' },
+    { value: 25, label: '25 per page' },
+    { value: 50, label: '50 per page' },
+    { value: 100, label: '100 per page' },
+  ];
+
+  // ✅ FIXED: Summary calculations with correct VAT
   const expenseSummary = useMemo(() => {
-    const total = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0) + parseFloat(e.vat_amount || 0), 0);
+    const total = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
     const withProof = expenses.filter(e => e.proof).length;
     return { total, count: expenses.length, withProof };
   }, [expenses]);
 
   const paymentSummary = useMemo(() => {
     const total = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-    // Enhanced proof detection for payments
     const withProof = payments.filter(p => 
       p.proof || p.proofUrl || p.proofFilename || p.attachment
     ).length;
@@ -482,13 +510,30 @@ const Documents = () => {
   const currentItems = activeTab === 'expenses' ? expenses : payments;
   const currentSummary = activeTab === 'expenses' ? expenseSummary : paymentSummary;
 
+  // ✅ PAGINATION LOGIC
+  const totalPages = Math.ceil(currentItems.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedItems = currentItems.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    setSelectedItems([]); // Clear selections when changing pages
+  };
+
+  const handleItemsPerPageChange = (value) => {
+    setItemsPerPage(Number(value));
+    setCurrentPage(1);
+    setSelectedItems([]);
+  };
+
   // Mobile card view component
   const MobileItemCard = ({ item, type }) => {
     const isExpense = type === 'expense';
     const property = isExpense ? properties.find(p => p.id === item.property_id) : null;
-    const total = isExpense 
-      ? parseFloat(item.amount || 0) + parseFloat(item.vat_amount || 0)
-      : parseFloat(item.amount || 0);
+    
+    // ✅ FIXED: Use correct total calculation
+    const total = parseFloat(item.amount || 0);
     
     const proofUrl = isExpense 
       ? getFullExpenseProofUrl(item)
@@ -572,6 +617,102 @@ const Documents = () => {
           </Button>
         </div>
       </Card>
+    );
+  };
+
+  // Pagination Component
+  const PaginationControls = () => {
+    const pageNumbers = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i);
+    }
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 px-4">
+        {/* Items per page selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">Show:</span>
+          <Select
+            options={itemsPerPageOptions}
+            value={itemsPerPage}
+            onChange={handleItemsPerPageChange}
+            className="w-32"
+          />
+        </div>
+
+        {/* Page info */}
+        <div className="text-sm text-gray-600">
+          Showing {startIndex + 1} to {Math.min(endIndex, currentItems.length)} of {currentItems.length} items
+        </div>
+
+        {/* Pagination buttons */}
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            variant="outline"
+            className="p-2"
+            title="Previous page"
+          >
+            <FiChevronLeft className="w-4 h-4" />
+          </Button>
+
+          {startPage > 1 && (
+            <>
+              <Button
+                onClick={() => handlePageChange(1)}
+                variant="outline"
+                className="px-3 py-2"
+              >
+                1
+              </Button>
+              {startPage > 2 && <span className="text-gray-500">...</span>}
+            </>
+          )}
+
+          {pageNumbers.map(page => (
+            <Button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              variant={currentPage === page ? 'primary' : 'outline'}
+              className={`px-3 py-2 ${currentPage === page ? 'bg-blue-600 text-white' : ''}`}
+            >
+              {page}
+            </Button>
+          ))}
+
+          {endPage < totalPages && (
+            <>
+              {endPage < totalPages - 1 && <span className="text-gray-500">...</span>}
+              <Button
+                onClick={() => handlePageChange(totalPages)}
+                variant="outline"
+                className="px-3 py-2"
+              >
+                {totalPages}
+              </Button>
+            </>
+          )}
+
+          <Button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            variant="outline"
+            className="p-2"
+            title="Next page"
+          >
+            <FiChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
     );
   };
 
@@ -663,16 +804,16 @@ const Documents = () => {
         /* Mobile View - Card Layout */
         <div>
           {/* Select All for Mobile */}
-          {currentItems.length > 0 && (
+          {paginatedItems.length > 0 && (
             <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
               <input 
                 type="checkbox" 
-                checked={currentItems.length > 0 && selectedItems.length === currentItems.length}
+                checked={paginatedItems.length > 0 && selectedItems.length === paginatedItems.length}
                 onChange={toggleSelectAll}
                 className="w-4 h-4 text-blue-600 rounded border-gray-300"
               />
               <span className="text-sm text-gray-600">
-                {selectedItems.length} of {currentItems.length} selected
+                {selectedItems.length} of {paginatedItems.length} selected
               </span>
             </div>
           )}
@@ -682,7 +823,7 @@ const Documents = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
               <p className="text-gray-600 mt-2">Loading...</p>
             </Card>
-          ) : currentItems.length === 0 ? (
+          ) : paginatedItems.length === 0 ? (
             <Card className="p-8 text-center">
               <FiFileText className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-semibold text-gray-900">No documents</h3>
@@ -692,7 +833,7 @@ const Documents = () => {
             </Card>
           ) : (
             <div>
-              {currentItems.map(item => (
+              {paginatedItems.map(item => (
                 <MobileItemCard 
                   key={item.id} 
                   item={item} 
@@ -701,6 +842,9 @@ const Documents = () => {
               ))}
             </div>
           )}
+
+          {/* Mobile Pagination */}
+          {!loading && paginatedItems.length > 0 && <PaginationControls />}
         </div>
       ) : (
         /* Desktop View - Table Layout */
@@ -714,7 +858,7 @@ const Documents = () => {
                     <th className="w-12 px-4 py-3">
                       <input 
                         type="checkbox" 
-                        checked={currentItems.length > 0 && selectedItems.length === currentItems.length}
+                        checked={paginatedItems.length > 0 && selectedItems.length === paginatedItems.length}
                         onChange={toggleSelectAll} 
                         className="w-4 h-4 text-blue-600 rounded border-gray-300"
                       />
@@ -734,19 +878,22 @@ const Documents = () => {
                   {loading ? (
                     <tr>
                       <td colSpan={activeTab === 'expenses' ? 9 : 8} className="text-center py-8">
-                        Loading...
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                          <p className="text-gray-600">Loading...</p>
+                        </div>
                       </td>
                     </tr>
-                  ) : currentItems.length === 0 ? (
+                  ) : paginatedItems.length === 0 ? (
                     <tr>
                       <td colSpan={activeTab === 'expenses' ? 9 : 8} className="text-center py-8 text-gray-500">
                         No {activeTab} found
                       </td>
                     </tr>
                   ) : activeTab === 'expenses' ? (
-                    expenses.map(expense => {
+                    paginatedItems.map(expense => {
                       const property = properties.find(p => p.id === expense.property_id);
-                      const total = parseFloat(expense.amount || 0) + parseFloat(expense.vat_amount || 0);
+                      const total = parseFloat(expense.amount || 0);
                       const proofUrl = getFullExpenseProofUrl(expense);
                       const hasProof = !!expense.proof;
 
@@ -811,7 +958,7 @@ const Documents = () => {
                       );
                     })
                   ) : (
-                    payments.map(payment => {
+                    paginatedItems.map(payment => {
                       const proofUrl = getFullPaymentProofUrl(payment);
                       const hasProof = !!(payment.proof || payment.proofUrl || payment.proofFilename || payment.attachment);
 
@@ -868,12 +1015,15 @@ const Documents = () => {
               </table>
             </div>
           </Card>
+
+          {/* Desktop Pagination */}
+          {!loading && paginatedItems.length > 0 && <PaginationControls />}
         </>
       )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-4 bg-linear-to-br from-blue-50 to-blue-100">
+        <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Documents</p>
@@ -883,7 +1033,7 @@ const Documents = () => {
           </div>
         </Card>
 
-        <Card className="p-4 bg-linear-to-br from-green-50 to-green-100">
+        <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">With Proof</p>
@@ -893,7 +1043,7 @@ const Documents = () => {
           </div>
         </Card>
 
-        <Card className="p-4 bg-linear-to-br from-purple-50 to-purple-100">
+        <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Amount</p>

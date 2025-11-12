@@ -1,4 +1,6 @@
 const Expense = require('../models/Expense');
+const Property = require('../models/Property');
+const Local = require('../models/Local');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
@@ -23,7 +25,7 @@ const deleteProofFile = async (proofPath) => {
 // -------------------- SERVICE FUNCTIONS --------------------
 
 // 🧾 Get all expenses with advanced filtering
-const getAllExpenses = async (filters = {}) => {
+const getAllExpenses = async (filters = {}, user = null) => {
   const where = {};
 
   if (filters.category) where.category = filters.category;
@@ -58,12 +60,39 @@ const getAllExpenses = async (filters = {}) => {
   const limit = parseInt(filters.limit) || 50;
   const offset = parseInt(filters.offset) || 0;
 
+  const include = [
+    {
+      model: Property,
+      as: 'propertyForExpense',
+      attributes: ['id', 'name', 'manager_id', 'location'],
+      required: user?.role === 'manager',
+      where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
+    },
+    {
+      model: Local,
+      as: 'localForExpense',
+      attributes: ['id', 'reference_code', 'property_id'],
+      include: user?.role === 'manager'
+        ? [
+            {
+              model: Property,
+              as: 'property',
+              attributes: ['id', 'manager_id'],
+              where: { manager_id: user.id },
+              required: false,
+            },
+          ]
+        : [],
+    },
+  ];
+
   const { count, rows } = await Expense.findAndCountAll({
     where,
     order: [['date', 'DESC']],
     limit,
     offset,
     paranoid: !filters.includeDeleted,
+    include,
   });
 
   return {
@@ -75,14 +104,24 @@ const getAllExpenses = async (filters = {}) => {
 };
 
 // 🔍 Get expense by ID
-const getExpenseById = async (id) => {
-  const expense = await Expense.findByPk(id, { paranoid: false });
+const getExpenseById = async (id, user = null) => {
+  const expense = await Expense.findByPk(id, {
+    paranoid: false,
+    include: [
+      { model: Property, as: 'propertyForExpense', attributes: ['id', 'manager_id'] },
+      { model: Local, as: 'localForExpense', attributes: ['id', 'property_id'], include: [{ model: Property, as: 'property', attributes: ['id', 'manager_id'] }] },
+    ],
+  });
   if (!expense) throw new Error('Expense not found');
+  const property = expense.propertyForExpense || expense.localForExpense?.property;
+  if (user?.role === 'manager' && property?.manager_id !== user.id) {
+    throw new Error('Access denied: You cannot view this expense');
+  }
   return expense;
 };
 
 // ➕ Create expense (file already processed by middleware)
-const createExpense = async (data, file) => {
+const createExpense = async (data, file, user = null) => {
   const {
     description,
     amount,
@@ -111,6 +150,29 @@ const createExpense = async (data, file) => {
 
   if (!propertyId && !localId) {
     throw new Error('Either propertyId or localId must be provided');
+  }
+
+  let targetPropertyId = propertyId || null;
+
+  if (localId) {
+    const local = await Local.findByPk(localId, {
+      include: [{ model: Property, as: 'property', attributes: ['id', 'manager_id'] }],
+    });
+    if (!local) throw new Error('Local not found');
+    targetPropertyId = targetPropertyId || local.property_id;
+    if (user?.role === 'manager' && local.property?.manager_id !== user.id) {
+      throw new Error('Access denied: You cannot create expenses for this local');
+    }
+  }
+
+  if (targetPropertyId) {
+    const property = await Property.findByPk(targetPropertyId, {
+      attributes: ['id', 'manager_id'],
+    });
+    if (!property) throw new Error('Property not found');
+    if (user?.role === 'manager' && property.manager_id !== user.id) {
+      throw new Error('Access denied: You cannot create expenses for this property');
+    }
   }
 
   const expenseId = uuidv4();
@@ -142,9 +204,9 @@ const createExpense = async (data, file) => {
     reference_number: referenceNumber || null,
     vendor_name: vendorName || null,
     vendor_contact: vendorContact || null,
-    property_id: propertyId || null,
+    property_id: targetPropertyId || null,
     local_id: localId || null,
-    created_by: createdBy || null,
+    created_by: createdBy || user?.id || null,
   });
 
   return expense;

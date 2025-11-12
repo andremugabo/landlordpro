@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Sun, Moon, Bell, LogOut, Settings, User, Menu } from 'lucide-react';
 import { toast } from 'react-toastify';
 import {
@@ -6,6 +6,19 @@ import {
   markNotificationRead,
 } from '../../services/userService';
 import { useNavigate } from 'react-router-dom';
+import defaultAvatar from '../../assets/react.svg';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+const resolveAvatarUrl = (avatar) => {
+  if (!avatar) return defaultAvatar;
+  if (avatar.startsWith('http')) return avatar;
+  if (avatar.startsWith('/uploads')) {
+    const trimmedBase = API_BASE_URL.replace(/\/$/, '');
+    return `${trimmedBase}${avatar}`;
+  }
+  return avatar;
+};
 
 const Topbar = ({ user, onLogout, onMenuClick }) => {
   const [darkMode, setDarkMode] = useState(
@@ -17,6 +30,14 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
   const menuRef = useRef(null);
 
   const navigate = useNavigate();
+
+  const displayName = useMemo(() => {
+    return user?.full_name || user?.name || user?.email?.split('@')[0] || 'User';
+  }, [user]);
+
+  const avatarUrl = useMemo(() => {
+    return user?.avatar ? resolveAvatarUrl(user.avatar) : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=14B8A6&color=fff&rounded=true`;
+  }, [user, displayName]);
 
   const goToProfile = () => {
     navigate('/profile');
@@ -193,14 +214,16 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
             aria-expanded={menuOpen}
           >
             <img
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-                user.name
-              )}&background=14B8A6&color=fff&rounded=true`}
-              alt={`${user.name} avatar`}
-              className="w-8 h-8 rounded-full"
+              src={avatarUrl}
+              alt={`${displayName} avatar`}
+              className="w-9 h-9 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = defaultAvatar;
+              }}
             />
             <span className="hidden sm:inline-block text-gray-800 dark:text-gray-200">
-              {user.name}
+              {displayName}
             </span>
           </button>
 
@@ -208,7 +231,7 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
             <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden animate-dropdown">
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                 <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                  {user.name}
+                  {displayName}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {user.email || 'Admin User'}

@@ -47,7 +47,8 @@ async function loginUser(data) {
     { expiresIn: '1h' }
   );
 
-  const { password_hash, ...safeUser } = user.toJSON();
+  const { password_hash, picture, ...rest } = user.toJSON();
+  const safeUser = { ...rest, avatar: picture || null };
   return { user: safeUser, token };
 }
 
@@ -116,7 +117,7 @@ async function updateUserPicture(id, picturePath) {
   const user = await User.findByPk(id);
   if (!user) throw new Error('User not found');
 
-  user.profile_picture = picturePath;
+  user.picture = picturePath;
   await user.save();
 
   await Notification.create({

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getAllTenants,
   createTenant,
@@ -6,12 +6,18 @@ import {
   deleteTenant,
   restoreTenant,
 } from '../../services/tenantService';
-import { Button, Modal, Input, Card } from '../../components';
+import { getAllLocals } from '../../services/localService';
+import leaseService from '../../services/leaseService';
+import { Button, Modal, Input, Card, Select } from '../../components';
 import { FiEdit, FiPlus, FiTrash, FiSearch, FiRefreshCcw } from 'react-icons/fi';
 import { showSuccess, showError, showInfo } from '../../utils/toastHelper';
+import useAccessibleProperties from '../../hooks/useAccessibleProperties';
 
 const TenantPage = () => {
   const [tenants, setTenants] = useState([]);
+  const [locals, setLocals] = useState([]);
+  const [leases, setLeases] = useState([]);
+  const [selectedPropertyId, setSelectedPropertyId] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [editData, setEditData] = useState({ name: '', email: '', phone: '' });
@@ -19,6 +25,60 @@ const TenantPage = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  const {
+    isManager,
+    properties,
+    propertyOptions,
+    loading: loadingProperties,
+  } = useAccessibleProperties();
+
+  useEffect(() => {
+    if (!isManager) return;
+
+    if (properties.length === 1) {
+      setSelectedPropertyId(properties[0].id);
+    } else if (!properties.find((property) => property.id === selectedPropertyId)) {
+      setSelectedPropertyId('');
+    }
+  }, [isManager, properties, selectedPropertyId]);
+
+  const fetchLocalsForFilter = useCallback(async (propertyId) => {
+    try {
+      const params = { page: 1, limit: 500 };
+      if (propertyId) {
+        params.propertyId = propertyId;
+      }
+      const response = await getAllLocals(params);
+      setLocals(response.locals || response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch locals for tenant filtering:', error);
+      setLocals([]);
+    }
+  }, []);
+
+  const fetchLeasesForFilter = useCallback(async () => {
+    try {
+      const response = await leaseService.getLeases(1, 500);
+      setLeases(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch leases for tenant filtering:', error);
+      setLeases([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isManager && properties.length > 0 && !selectedPropertyId) {
+      return;
+    }
+
+    fetchLocalsForFilter(selectedPropertyId || undefined);
+    fetchLeasesForFilter();
+  }, [selectedPropertyId, isManager, properties.length, fetchLocalsForFilter, fetchLeasesForFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedPropertyId]);
 
   const fetchTenants = async (pageNumber = 1, search = '') => {
     try {
@@ -40,8 +100,91 @@ const TenantPage = () => {
   };
 
   useEffect(() => {
+    if (isManager && properties.length > 0 && !selectedPropertyId) {
+      return;
+    }
     fetchTenants(page, searchTerm);
-  }, [page, searchTerm]);
+  }, [page, searchTerm, selectedPropertyId, isManager, properties.length]);
+
+  const localPropertyMap = useMemo(() => {
+    const map = new Map();
+    locals.forEach((local) => {
+      if (!local?.id) return;
+      const propertyId =
+        local.property_id ||
+        local.propertyId ||
+        local.property?.id ||
+        local.property?.property_id ||
+        null;
+      if (propertyId) {
+        map.set(local.id, propertyId);
+      }
+    });
+    return map;
+  }, [locals]);
+
+  const tenantPropertyMap = useMemo(() => {
+    const map = new Map();
+    leases.forEach((lease) => {
+      const tenantId = lease.tenant?.id;
+      const localId = lease.local?.id;
+      if (!tenantId || !localId) return;
+
+      const propertyId = localPropertyMap.get(localId);
+      if (!propertyId) return;
+
+      if (!map.has(tenantId)) {
+        map.set(tenantId, new Set());
+      }
+      map.get(tenantId).add(propertyId);
+    });
+    return map;
+  }, [leases, localPropertyMap]);
+
+  const accessiblePropertyIds = useMemo(
+    () => new Set(properties.map((property) => property.id)),
+    [properties]
+  );
+
+  const searchTermLower = searchTerm.toLowerCase();
+
+  const filteredTenants = useMemo(() => {
+    return tenants.filter((tenant) => {
+      const matchesSearch =
+        !searchTermLower ||
+        tenant.name?.toLowerCase().includes(searchTermLower) ||
+        tenant.email?.toLowerCase().includes(searchTermLower) ||
+        tenant.phone?.toLowerCase().includes(searchTermLower);
+      if (!matchesSearch) return false;
+
+      const tenantProperties = tenantPropertyMap.get(tenant.id);
+
+      if (isManager) {
+        if (!tenantProperties || tenantProperties.size === 0) return false;
+        const hasAccessible = [...tenantProperties].some((propertyId) =>
+          accessiblePropertyIds.has(propertyId)
+        );
+        if (!hasAccessible) return false;
+        if (selectedPropertyId) {
+          return tenantProperties.has(selectedPropertyId);
+        }
+        return true;
+      }
+
+      if (selectedPropertyId) {
+        return tenantProperties?.has(selectedPropertyId) ?? false;
+      }
+
+      return true;
+    });
+  }, [
+    tenants,
+    searchTermLower,
+    tenantPropertyMap,
+    isManager,
+    accessiblePropertyIds,
+    selectedPropertyId
+  ]);
 
   const handleEditClick = (tenant) => {
     setSelectedTenant(tenant);
@@ -110,6 +253,17 @@ const TenantPage = () => {
           <h1 className="text-lg sm:text-xl font-semibold text-gray-800">Tenants Management</h1>
           <p className="text-sm text-gray-500">View, add, or manage tenants</p>
         </div>
+        <div className="w-full sm:w-72">
+          <Select
+            label="Filter by Property"
+            value={propertyOptions.find((option) => option.value === selectedPropertyId) ?? null}
+            options={propertyOptions}
+            isClearable={!isManager}
+            isDisabled={loadingProperties || (isManager && properties.length <= 1)}
+            placeholder={isManager ? 'Select your property...' : 'All properties'}
+            onChange={(option) => setSelectedPropertyId(option?.value || '')}
+          />
+        </div>
         <Button
           className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm transition w-full sm:w-auto justify-center"
           onClick={() => {
@@ -117,12 +271,19 @@ const TenantPage = () => {
             setEditData({ name: '', email: '', phone: '' });
             setModalOpen(true);
           }}
+          disabled={isManager && properties.length === 0}
         >
           <FiPlus className="text-base" />
           <span>Add Tenant</span>
         </Button>
       </div>
 
+      {isManager && !loadingProperties && properties.length === 0 ? (
+        <Card className="p-6 text-center text-gray-600">
+          You are not assigned to any property yet. Please contact an administrator.
+        </Card>
+      ) : (
+        <>
       {/* Search */}
       <div className="relative w-full">
         <FiSearch className="absolute left-3 top-3 text-gray-400" />
@@ -151,14 +312,14 @@ const TenantPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {tenants.length === 0 ? (
+                {filteredTenants.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-6 text-center text-gray-500">
                       No tenants found
                     </td>
                   </tr>
                 ) : (
-                  tenants.map((tenant) => (
+                  filteredTenants.map((tenant) => (
                     <tr
                       key={tenant.id}
                       className={`transition-colors ${
@@ -267,6 +428,8 @@ const TenantPage = () => {
             />
           </div>
         </Modal>
+      )}
+        </>
       )}
     </div>
   );

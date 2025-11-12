@@ -26,6 +26,12 @@ Property.init(
       allowNull: true
     },
 
+    manager_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: 'users', key: 'id' }
+    },
+
     number_of_floors: {
       type: DataTypes.INTEGER,
       allowNull: false,

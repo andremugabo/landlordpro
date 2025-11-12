@@ -2,6 +2,7 @@ import axios from 'axios';
 
 // ✅ Base URL fallback if env variable is missing
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL) + '/api/floors';
+const PROPERTIES_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL) + '/api/properties';
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -48,7 +49,10 @@ export const getAllFloors = async (params = {}) => {
 // Get floors by property ID
 export const getFloorsByPropertyId = async (propertyId) => {
   try {
-    const response = await axiosInstance.get(`/property/${propertyId}`);
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${PROPERTIES_API_BASE_URL}/${propertyId}/floors`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
     return response.data;
   } catch (err) {
     throw new Error(err?.message || `Failed to fetch floors for property ${propertyId}`);

@@ -2,6 +2,7 @@ const Payment = require('../models/Payment');
 const Lease = require('../models/Lease');
 const PaymentMode = require('../models/PaymentMode');
 const Notification = require('../models/Notification');
+const { Local, Property } = require('../models');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
@@ -46,13 +47,37 @@ const processProofOfPayment = async (file, paymentId) => {
 
 // -------------------- PAYMENT SERVICE --------------------
 
-const createPayment = async (data, file) => {
+const createPayment = async (data, file, user) => {
   const { amount, leaseId, paymentModeId, startDate, endDate } = data;
 
   if (!amount || !leaseId || !paymentModeId || !startDate || !endDate) {
     throw new Error('Amount, leaseId, paymentModeId, startDate, and endDate are required');
   }
   if (new Date(startDate) > new Date(endDate)) throw new Error('Start date cannot be after end date');
+
+  const lease = await Lease.findByPk(leaseId, {
+    include: [
+      {
+        model: Local,
+        as: 'local',
+        include: [{ model: Property, as: 'property', attributes: ['id', 'manager_id'] }],
+      },
+    ],
+  });
+
+  if (!lease) {
+    throw new Error('Lease not found');
+  }
+
+  const leaseProperty = lease.local?.property;
+
+  if (!leaseProperty) {
+    throw new Error('Unable to resolve property associated with this lease');
+  }
+
+  if (user?.role === 'manager' && leaseProperty.manager_id !== user.id) {
+    throw new Error('Access denied: You cannot create payments for this property');
+  }
 
   const invoiceNumber = generateInvoiceNumber();
   const paymentId = uuidv4();
@@ -63,6 +88,7 @@ const createPayment = async (data, file) => {
     amount,
     leaseId,
     paymentModeId,
+    propertyId: leaseProperty.id,
     startDate,
     endDate,
     invoiceNumber,
@@ -139,7 +165,7 @@ const notifyUpcomingPayments = async () => {
 
 // -------------------- OTHER SERVICE FUNCTIONS --------------------
 
-const getAllPayments = async (term = '') => {
+const getAllPayments = async (term = '', user = null) => {
   const whereClause = term
     ? {
         [Op.or]: [
@@ -149,26 +175,70 @@ const getAllPayments = async (term = '') => {
       }
     : {};
 
-  return Payment.findAll({
+  const payments = await Payment.findAll({
     where: whereClause,
     include: [
-      { model: Lease, as: 'leaseForPayment' },
+      {
+        model: Lease,
+        as: 'leaseForPayment',
+        include: [
+          {
+            model: Local,
+            as: 'local',
+            attributes: ['id', 'reference_code', 'property_id'],
+            required: user?.role === 'manager',
+            include: [
+              {
+                model: Property,
+                as: 'property',
+                attributes: ['id', 'name', 'location', 'manager_id'],
+                required: user?.role === 'manager',
+                where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
+              },
+            ],
+          },
+        ],
+      },
       { model: PaymentMode, as: 'paymentModeForPayment' },
     ],
     order: [['created_at', 'DESC']],
     paranoid: false,
   });
+  return payments.map((payment) => {
+    const plain = payment.toJSON();
+    const property = plain.leaseForPayment?.local?.property;
+    return {
+      ...plain,
+      propertyId: plain.propertyId || property?.id || plain.leaseForPayment?.propertyId || null,
+      propertyName: property?.name || null,
+    };
+  });
 };
 
-const getPaymentById = async (id) => {
+const getPaymentById = async (id, user = null) => {
   const payment = await Payment.findByPk(id, {
     include: [
-      { model: Lease, as: 'leaseForPayment' },
+      {
+        model: Lease,
+        as: 'leaseForPayment',
+        include: [
+          {
+            model: Local,
+            as: 'local',
+            attributes: ['id', 'reference_code', 'property_id'],
+            include: [{ model: Property, as: 'property', attributes: ['id', 'name', 'manager_id', 'location'] }],
+          },
+        ],
+      },
       { model: PaymentMode, as: 'paymentModeForPayment' },
     ],
     paranoid: false,
   });
   if (!payment) throw new Error('Payment not found');
+  const property = payment.leaseForPayment?.local?.property;
+  if (user?.role === 'manager' && property?.manager_id !== user.id) {
+    throw new Error('Access denied: You cannot view this payment');
+  }
   return payment;
 };
 

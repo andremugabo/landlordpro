@@ -39,10 +39,11 @@ const normalizeExpenseData = (data) => ({
 const createExpense = async (req, res) => {
   try {
     const payload = normalizeExpenseData(req.body);
+    payload.createdBy = req.user.id;
     // Default date if not provided
     if (!payload.date) payload.date = new Date();
 
-    const expense = await expenseService.createExpense(payload, req.file);
+    const expense = await expenseService.createExpense(payload, req.file, req.user);
 
     res.status(201).json({
       success: true,
@@ -92,7 +93,7 @@ const getAllExpenses = async (req, res) => {
       includeDeleted: req.query.includeDeleted === 'true',
     };
 
-    const result = await expenseService.getAllExpenses(filters);
+    const result = await expenseService.getAllExpenses(filters, req.user);
 
     res.json({
       success: true,
@@ -116,7 +117,7 @@ const getExpenseById = async (req, res) => {
     const { id } = req.params;
     if (!isUuid(id)) return res.status(400).json({ success: false, message: 'Invalid expense ID' });
 
-    const expense = await expenseService.getExpenseById(id);
+    const expense = await expenseService.getExpenseById(id, req.user);
     res.json({ success: true, data: expense });
   } catch (err) {
     handleError(res, err, 'Fetch expense');

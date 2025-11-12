@@ -788,7 +788,7 @@ const ExpensePage = () => {
               </Button>
 
               {/* Current Page Indicator */}
-              <span className="flex items-center justify-center min-w-[2.5rem] px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm font-semibold shadow-sm ring-2 ring-yellow-300" aria-current="page">
+              <span className="flex items-center justify-center min-w-10 px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm font-semibold shadow-sm ring-2 ring-yellow-300" aria-current="page">
                 {page}
               </span>
 

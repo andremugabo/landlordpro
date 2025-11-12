@@ -31,9 +31,25 @@ class FloorService {
 
   /**
    * Get floors by property ID with safe column handling
+   * ✅ FIXED: No longer throws 404 for empty floors
    */
   async getFloorsByPropertyId(propertyId) {
     try {
+      // Validate propertyId
+      if (!propertyId) {
+        const error = new Error('Property ID is required');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // Optional: Verify property exists (recommended)
+      const property = await Property.findByPk(propertyId);
+      if (!property) {
+        const error = new Error('Property not found');
+        error.statusCode = 404;
+        throw error;
+      }
+
       const floors = await Floor.findAll({
         where: { property_id: propertyId },
         include: [
@@ -51,13 +67,26 @@ class FloorService {
         order: [['level_number', 'ASC']],
       });
 
-      if (!floors || floors.length === 0) {
-        const error = new Error('No floors found for this property');
-        error.statusCode = 404;
-        throw error;
-      }
+      // ✅ Return empty array if no floors - this is valid!
+      // Transform data to include helpful metadata
+      return {
+        floors: floors.map(floor => ({
+          id: floor.id,
+          name: floor.name,
+          level_number: floor.level_number,
+          property_id: floor.property_id,
+          property_name: floor.propertyForFloor?.name,
+          localsForFloor: floor.localsForFloor || [],
+          locals: floor.localsForFloor || [], // Alias for frontend compatibility
+          locals_count: floor.localsForFloor?.length || 0
+        })),
+        property: {
+          id: property.id,
+          name: property.name,
+          location: property.location
+        }
+      };
 
-      return floors;
     } catch (error) {
       // If columns don't exist, fall back to basic query
       if (error.message.includes('column') && error.message.includes('does not exist')) {
@@ -84,18 +113,34 @@ class FloorService {
         const floorsWithPlaceholders = floors.map(floor => {
           const localsWithPlaceholders = (floor.localsForFloor || []).map(local => ({
             ...local.toJSON(),
-            local_number: `LOC-${local.id.substring(0, 8)}`, // Generate placeholder
+            local_number: `LOC-${local.id.substring(0, 8)}`,
             area: null
           }));
           
           return {
-            ...floor.toJSON(),
-            localsForFloor: localsWithPlaceholders
+            id: floor.id,
+            name: floor.name,
+            level_number: floor.level_number,
+            property_id: floor.property_id,
+            property_name: floor.propertyForFloor?.name,
+            localsForFloor: localsWithPlaceholders,
+            locals: localsWithPlaceholders,
+            locals_count: localsWithPlaceholders.length
           };
         });
 
-        return floorsWithPlaceholders;
+        const property = await Property.findByPk(propertyId);
+        return {
+          floors: floorsWithPlaceholders,
+          property: property ? {
+            id: property.id,
+            name: property.name,
+            location: property.location
+          } : null
+        };
       }
+      
+      console.error('getFloorsByPropertyId error:', error);
       throw error;
     }
   }
@@ -465,8 +510,9 @@ class FloorService {
 
   /**
    * Occupancy report for all floors (with optional property filter) with safe column handling
+   * ✅ FIXED: Returns array directly without wrapper
    */
-  async getAllFloorsOccupancy(propertyId = null) {
+  async getAllFloorsOccupancy(propertyId = null, user = null) {
     const whereClause = {};
     if (propertyId) {
       whereClause.property_id = propertyId;
@@ -475,14 +521,24 @@ class FloorService {
     try {
       const floors = await Floor.findAll({
         where: whereClause,
-        include: { 
-          model: Local, 
-          as: 'localsForFloor', 
-          attributes: ['id', 'status', 'local_number', 'area', 'rent_price'] 
-        },
+        include: [
+          {
+            model: Property,
+            as: 'propertyForFloor',
+            attributes: ['id', 'name', 'location', 'manager_id'],
+            required: user?.role === 'manager',
+            where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
+          },
+          {
+            model: Local,
+            as: 'localsForFloor',
+            attributes: ['id', 'status', 'local_number', 'area', 'rent_price'],
+          },
+        ],
         order: [['level_number', 'ASC']],
       });
 
+      // ✅ Return array directly (not wrapped in object)
       return floors.map(floor => {
         const locals = floor.localsForFloor || [];
         const total = locals.length;
@@ -502,6 +558,7 @@ class FloorService {
           level_number: floor.level_number,
           property_id: floor.property_id,
           property_name: floor.propertyForFloor?.name,
+          property_location: floor.propertyForFloor?.location,
           total_locals: total,
           occupied,
           available,
@@ -520,11 +577,20 @@ class FloorService {
         
         const floors = await Floor.findAll({
           where: whereClause,
-          include: { 
-            model: Local, 
-            as: 'localsForFloor', 
-            attributes: ['id', 'status'] 
-          },
+          include: [
+            {
+              model: Property,
+              as: 'propertyForFloor',
+              attributes: ['id', 'name', 'location', 'manager_id'],
+              required: user?.role === 'manager',
+              where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
+            },
+            {
+              model: Local,
+              as: 'localsForFloor',
+              attributes: ['id', 'status'],
+            },
+          ],
           order: [['level_number', 'ASC']],
         });
 
@@ -541,6 +607,7 @@ class FloorService {
             level_number: floor.level_number,
             property_id: floor.property_id,
             property_name: floor.propertyForFloor?.name,
+            property_location: floor.propertyForFloor?.location,
             total_locals: total,
             occupied,
             available,
@@ -553,6 +620,8 @@ class FloorService {
           };
         });
       }
+      
+      console.error('getAllFloorsOccupancy error:', error);
       throw error;
     }
   }

@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const Lease = require('../models/Lease');
 const Local = require('../models/Local');
 const Tenant = require('../models/Tenant');
+const Property = require('../models/Property');
 
 function formatLease(lease) {
   return {
@@ -12,19 +13,31 @@ function formatLease(lease) {
     endDate: lease.end_date,
     leaseAmount: lease.lease_amount,
     status: lease.status,
-    local: lease.local ? {
-      id: lease.local.id,
-      referenceCode: lease.local.reference_code,
-      status: lease.local.status,
-      sizeM2: lease.local.size_m2
-    } : null,
-    tenant: lease.tenant ? {
-      id: lease.tenant.id,
-      name: lease.tenant.name,
-      email: lease.tenant.email
-    } : null,
+    local: lease.local
+      ? {
+          id: lease.local.id,
+          referenceCode: lease.local.reference_code,
+          status: lease.local.status,
+          sizeM2: lease.local.size_m2,
+          propertyId: lease.local.property ? lease.local.property.id : lease.local.property_id,
+          property: lease.local.property
+            ? {
+                id: lease.local.property.id,
+                name: lease.local.property.name,
+                location: lease.local.property.location,
+              }
+            : null,
+        }
+      : null,
+    tenant: lease.tenant
+      ? {
+          id: lease.tenant.id,
+          name: lease.tenant.name,
+          email: lease.tenant.email,
+        }
+      : null,
     createdAt: lease.created_at,
-    updatedAt: lease.updated_at
+    updatedAt: lease.updated_at,
   };
 }
 
@@ -68,7 +81,7 @@ async function checkOverlap(localId, start, end, excludeLeaseId = null) {
 }
 
 /** Create a new lease - COMPLETELY DEBUGGED VERSION */
-async function createLease({ startDate, endDate, leaseAmount, localId, tenantId, status = 'active' }) {
+async function createLease({ startDate, endDate, leaseAmount, localId, tenantId, status = 'active' }, user = null) {
   try {
     console.log('createLease called with:', { startDate, endDate, leaseAmount, localId, tenantId, status });
 
@@ -94,6 +107,15 @@ async function createLease({ startDate, endDate, leaseAmount, localId, tenantId,
     const start = new Date(startDate);
     const end = new Date(endDate);
     if (start >= end) throw new Error('startDate must be before endDate');
+
+    const local = await Local.findByPk(localId, {
+      include: [{ model: Property, as: 'property', attributes: ['id', 'manager_id'] }],
+    });
+    if (!local) throw new Error('Local not found');
+
+    if (user?.role === 'manager' && local.property?.manager_id !== user.id) {
+      throw new Error('Access denied: You cannot create leases for this property');
+    }
 
     console.log('Calling checkOverlap...');
     await checkOverlap(localId, start, end);
@@ -145,14 +167,23 @@ async function createLease({ startDate, endDate, leaseAmount, localId, tenantId,
 }
 
 /** Update lease by ID */
-async function updateLease(id, data) {
+async function updateLease(id, data, user = null) {
   const lease = await Lease.findByPk(id, {
     include: [
       { model: Tenant, as: 'tenant', attributes: ['id', 'name', 'email'] },
-      { model: Local, as: 'local', attributes: ['id', 'reference_code', 'status', 'size_m2'] }
-    ]
+      {
+        model: Local,
+        as: 'local',
+        attributes: ['id', 'reference_code', 'status', 'size_m2', 'property_id'],
+        include: [{ model: Property, as: 'property', attributes: ['id', 'manager_id'] }],
+      },
+    ],
   });
   if (!lease) throw new Error('Lease not found');
+
+  if (user?.role === 'manager' && lease.local?.property?.manager_id !== user.id) {
+    throw new Error('Access denied: You cannot modify leases for this property');
+  }
 
   const start = data.startDate ? new Date(data.startDate) : lease.start_date;
   const end = data.endDate ? new Date(data.endDate) : lease.end_date;
@@ -180,7 +211,7 @@ async function updateLease(id, data) {
 }
 
 /** Get all leases with pagination and optional status filter */
-async function getAllLeases({ page = 1, limit = 10, status }) {
+async function getAllLeases({ page = 1, limit = 10, status }, user = null) {
   const offset = (page - 1) * limit;
 
   const whereClause = {};
@@ -196,12 +227,26 @@ async function getAllLeases({ page = 1, limit = 10, status }) {
     where: whereClause,
     include: [
       { model: Tenant, as: 'tenant', attributes: ['id', 'name', 'email'] },
-      { model: Local, as: 'local', attributes: ['id', 'reference_code', 'status', 'size_m2'] }
+      {
+        model: Local,
+        as: 'local',
+        attributes: ['id', 'reference_code', 'status', 'size_m2', 'property_id'],
+        required: user?.role === 'manager',
+        include: [
+          {
+            model: Property,
+            as: 'property',
+            attributes: ['id', 'name', 'location', 'manager_id'],
+            required: user?.role === 'manager',
+            where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
+          },
+        ],
+      },
     ],
+    order: [['created_at', 'DESC']],
     limit,
     offset,
-    order: [['created_at', 'DESC']],
-    paranoid: true
+    paranoid: true,
   });
 
   const data = rows.map(lease => {
@@ -213,16 +258,24 @@ async function getAllLeases({ page = 1, limit = 10, status }) {
 }
 
 /** Get lease by ID */
-async function getLeaseById(id) {
+async function getLeaseById(id, user = null) {
   const lease = await Lease.findByPk(id, {
     include: [
       { model: Tenant, as: 'tenant', attributes: ['id', 'name', 'email'] },
-      { model: Local, as: 'local', attributes: ['id', 'reference_code', 'status', 'size_m2'] }
+      {
+        model: Local,
+        as: 'local',
+        attributes: ['id', 'reference_code', 'status', 'size_m2', 'property_id'],
+        include: [{ model: Property, as: 'property', attributes: ['id', 'name', 'manager_id', 'location'] }],
+      },
     ],
-    paranoid: true
+    paranoid: true,
   });
   if (!lease) throw new Error('Lease not found');
 
+  if (user?.role === 'manager' && lease.local?.property?.manager_id !== user.id) {
+    throw new Error('Access denied: You cannot view this lease');
+  }
   if (lease.status === 'active' && lease.end_date < new Date()) lease.status = 'expired';
   return formatLease(lease);
 }

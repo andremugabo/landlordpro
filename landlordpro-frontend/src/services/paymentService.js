@@ -47,6 +47,7 @@ export const createPayment = async (data) => {
   formData.append('paymentModeId', data.paymentModeId);
   formData.append('startDate', data.startDate);
   formData.append('endDate', data.endDate);
+  if (data.propertyId) formData.append('propertyId', data.propertyId);
   if (data.proof) formData.append('proof', data.proof);
 
   const response = await axiosInstance.post('/', formData, {
@@ -63,6 +64,7 @@ export const updatePayment = async (id, data) => {
   if (data.paymentModeId) formData.append('paymentModeId', data.paymentModeId);
   if (data.startDate) formData.append('startDate', data.startDate);
   if (data.endDate) formData.append('endDate', data.endDate);
+  if (data.propertyId) formData.append('propertyId', data.propertyId);
   if (data.proof) formData.append('proof', data.proof);
 
   const response = await axiosInstance.put(`/${id}`, formData, {

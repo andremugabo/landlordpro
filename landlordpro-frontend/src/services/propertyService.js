@@ -9,6 +9,14 @@ const axiosInstance = axios.create({
   timeout: 10000
 });
 
+// ------------------- HELPER: Extract Error Message -------------------
+const getErrorMessage = (error) => {
+  if (error?.message) return error.message;
+  if (error?.error) return error.error;
+  if (typeof error === 'string') return error;
+  return 'An unexpected error occurred';
+};
+
 // Attach token automatically
 axiosInstance.interceptors.request.use(
   (config) => {
@@ -23,21 +31,31 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
+    let errorMessage = 'An error occurred';
+
     if (error.code === 'ECONNABORTED') {
-      showError('Request timeout. Please try again.');
+      errorMessage = 'Request timeout. Please try again.';
     } else if (!error.response) {
-      showError('Network error. Please check your connection.');
+      errorMessage = 'Network error. Please check your connection.';
     } else if (error.response?.status === 401) {
-      showError('Unauthorized. Please log in.');
+      errorMessage = 'Unauthorized. Please log in.';
       // Optional: Redirect to login page
       // window.location.href = '/login';
     } else if (error.response?.status === 403) {
-      showError('Access denied.');
+      errorMessage = 'Access denied.';
     } else if (error.response?.status === 404) {
-      showError('Resource not found.');
+      errorMessage = error.response?.data?.message || 'Resource not found.';
     } else if (error.response?.status >= 500) {
-      showError('Server error. Please try again later.');
+      errorMessage = 'Server error. Please try again later.';
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
     }
+
+    console.error('API Error:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: errorMessage
+    });
     
     return Promise.reject(error.response?.data || error);
   }
@@ -49,6 +67,8 @@ axiosInstance.interceptors.response.use(
 export const getAllProperties = async (page = 1, limit = 10) => {
   try {
     const { data } = await axiosInstance.get('/', { params: { page, limit } });
+    
+    console.log('getAllProperties response:', data);
     
     // Handle different possible response structures
     if (data.data && Array.isArray(data.data.properties)) {
@@ -90,7 +110,8 @@ export const getAllProperties = async (page = 1, limit = 10) => {
     }
   } catch (err) {
     console.error('getAllProperties error:', err);
-    showError(err.message || 'Failed to fetch properties.');
+    const message = getErrorMessage(err);
+    showError(message || 'Failed to fetch properties.');
     // Return safe fallback instead of throwing to prevent page crashes
     return {
       properties: [],
@@ -103,11 +124,30 @@ export const getAllProperties = async (page = 1, limit = 10) => {
 // Get a property by ID
 export const getPropertyById = async (id) => {
   try {
+    console.log('getPropertyById called with id:', id);
     const { data } = await axiosInstance.get(`/${id}`);
-    return data.data || null;
+    console.log('getPropertyById response:', data);
+    
+    // Handle different response structures
+    if (data.data) {
+      return data.data;
+    } else if (data.property) {
+      return data.property;
+    } else if (data.id) {
+      // Direct property object
+      return data;
+    }
+    
+    return null;
   } catch (err) {
-    console.error('getPropertyById error:', err);
-    showError(err.message || 'Property not found.');
+    console.error('getPropertyById error:', {
+      id,
+      error: err,
+      status: err.response?.status,
+      data: err.response?.data
+    });
+    const message = getErrorMessage(err);
+    showError(message || 'Property not found.');
     throw err;
   }
 };
@@ -123,7 +163,8 @@ export const createProperty = async (propertyData, refreshCallback) => {
     return data.data || null;
   } catch (err) {
     console.error('createProperty error:', err);
-    showError(err.message || 'Failed to create property.');
+    const message = getErrorMessage(err);
+    showError(message || 'Failed to create property.');
     throw err;
   }
 };
@@ -139,7 +180,8 @@ export const updateProperty = async (id, propertyData, refreshCallback) => {
     return data.data || null;
   } catch (err) {
     console.error('updateProperty error:', err);
-    showError(err.message || 'Failed to update property.');
+    const message = getErrorMessage(err);
+    showError(message || 'Failed to update property.');
     throw err;
   }
 };
@@ -155,7 +197,8 @@ export const deleteProperty = async (id, refreshCallback) => {
     return data || null;
   } catch (err) {
     console.error('deleteProperty error:', err);
-    showError(err.message || 'Failed to delete property.');
+    const message = getErrorMessage(err);
+    showError(message || 'Failed to delete property.');
     throw err;
   }
 };
@@ -165,23 +208,38 @@ export const deleteProperty = async (id, refreshCallback) => {
 // Get all floors for a property
 export const getFloorsByPropertyId = async (propertyId) => {
   try {
+    console.log('getFloorsByPropertyId called with propertyId:', propertyId);
     const { data } = await axiosInstance.get(`/${propertyId}/floors`);
+    console.log('getFloorsByPropertyId raw response:', data);
     
     // Handle different response structures for floors
-    if (Array.isArray(data.data)) {
-      return data.data;
-    } else if (Array.isArray(data.data?.floors)) {
-      return data.data.floors;
+    // ✅ Match the new backend structure: { floors: [...], property: {...} }
+    if (data.data && Array.isArray(data.data.floors)) {
+      console.log('Response structure: data.data.floors (length:', data.data.floors.length, ')');
+      return data.data; // Return entire object with floors and property
+    } else if (Array.isArray(data.data)) {
+      console.log('Response structure: data.data array (length:', data.data.length, ')');
+      return { floors: data.data, property: null };
+    } else if (data.floors && Array.isArray(data.floors)) {
+      console.log('Response structure: data.floors (length:', data.floors.length, ')');
+      return data; // Already has floors and property
     } else if (Array.isArray(data)) {
-      return data;
+      console.log('Response structure: direct array (length:', data.length, ')');
+      return { floors: data, property: null };
     } else {
       console.warn('Unexpected floors response structure:', data);
-      return [];
+      return { floors: [], property: null };
     }
   } catch (err) {
-    console.error('getFloorsByPropertyId error:', err);
-    showError(err.message || 'Failed to fetch floors.');
-    return []; // Return empty array instead of throwing
+    console.error('getFloorsByPropertyId error:', {
+      propertyId,
+      error: err,
+      status: err.response?.status,
+      data: err.response?.data
+    });
+    const message = getErrorMessage(err);
+    showError(message || 'Failed to fetch floors.');
+    return { floors: [], property: null }; // Return consistent structure
   }
 };
 
@@ -190,7 +248,9 @@ export const getFloorsByPropertyId = async (propertyId) => {
 // Get all locals for a property
 export const getLocalsByPropertyId = async (propertyId) => {
   try {
+    console.log('getLocalsByPropertyId called with propertyId:', propertyId);
     const { data } = await axiosInstance.get(`/${propertyId}/locals`);
+    console.log('getLocalsByPropertyId response:', data);
     
     // Handle different response structures for locals
     if (Array.isArray(data.data)) {
@@ -205,7 +265,8 @@ export const getLocalsByPropertyId = async (propertyId) => {
     }
   } catch (err) {
     console.error('getLocalsByPropertyId error:', err);
-    showError(err.message || 'Failed to fetch locals.');
+    const message = getErrorMessage(err);
+    showError(message || 'Failed to fetch locals.');
     return []; // Return empty array instead of throwing
   }
 };
@@ -215,10 +276,6 @@ export const debugApiResponse = (response, endpoint) => {
   console.log(`API Response from ${endpoint}:`, response);
   return response;
 };
-
-
-
-
 
 // ================= Assign Manager to Property ================= //
 export const assignManagerToProperty = async (propertyId, managerId, refreshCallback) => {
@@ -238,7 +295,8 @@ export const assignManagerToProperty = async (propertyId, managerId, refreshCall
     return data.data || null;
   } catch (err) {
     console.error('assignManagerToProperty error:', err);
-    showError(err.message || 'Failed to assign manager.');
+    const message = getErrorMessage(err);
+    showError(message || 'Failed to assign manager.');
     throw err;
   }
 };

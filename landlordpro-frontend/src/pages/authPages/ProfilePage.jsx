@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, Button, Input, Modal } from "../../components";
-import { 
-  FiEdit, 
-  FiMail, 
-  FiPhone, 
-  FiCamera, 
-  FiUser, 
-  FiX, 
+import {
+  FiEdit,
+  FiMail,
+  FiPhone,
+  FiCamera,
+  FiUser,
+  FiX,
   FiArrowLeft,
   FiCalendar,
   FiCheckCircle,
@@ -22,7 +22,8 @@ import {
   FiMapPin
 } from "react-icons/fi";
 import defaultAvatar from "../../assets/react.svg";
-import { getProfile, updateProfile, uploadAvatar } from "../../services/userService";
+import { getProfile, updateProfile, uploadAvatar, updatePassword } from "../../services/userService";
+import { saveLoggedInUser } from "../../services/AuthService";
 import { showSuccess, showError } from "../../utils/toastHelper";
 import { useNavigate } from "react-router-dom";
 
@@ -57,6 +58,7 @@ const ProfilePage = () => {
       setLoading(true);
       const profile = await getProfile();
       setUser(profile.user);
+      saveLoggedInUser(profile.user);
     } catch (err) {
       showError("Failed to load profile");
     } finally {
@@ -110,12 +112,14 @@ const ProfilePage = () => {
       };
 
       const updated = await updateProfile(dataToUpdate);
-      setUser(updated);
+      const updatedUser = updated?.user || updated;
+      setUser(updatedUser);
+      saveLoggedInUser(updatedUser);
       setEditModalOpen(false);
       setAvatarPreview(null);
       showSuccess("Profile updated successfully!");
     } catch (err) {
-      showError(err.response?.data?.message || err.message || "Error updating profile");
+      showError(err.message || err.response?.data?.message || "Error updating profile");
     } finally {
       setSaving(false);
     }
@@ -139,12 +143,15 @@ const ProfilePage = () => {
 
     try {
       setSaving(true);
-      // await changePassword(passwordData);
+      await updatePassword({
+        oldPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
       showSuccess("Password changed successfully!");
       setPasswordModalOpen(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
-      showError(err.response?.data?.message || "Failed to change password");
+      showError(err.message || err.response?.data?.message || "Failed to change password");
     } finally {
       setSaving(false);
     }
@@ -198,6 +205,18 @@ const ProfilePage = () => {
     return Math.round((completed / total) * 100);
   };
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+  const resolveAvatarUrl = (avatar) => {
+    if (!avatar) return defaultAvatar;
+    if (typeof avatar === 'string' && avatar.startsWith('http')) return avatar;
+    if (typeof avatar === 'string' && avatar.startsWith('/uploads')) {
+      const base = API_BASE_URL.replace(/\/$/, '');
+      return `${base}${avatar}`;
+    }
+    return avatar;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -226,354 +245,306 @@ const ProfilePage = () => {
     );
   }
 
-  const displayAvatar = avatarPreview || user.avatar || defaultAvatar;
+  const displayAvatar = avatarPreview || resolveAvatarUrl(user.avatar);
   const completionPercentage = calculateCompletion();
 
   return (
-    <div className="px-4 sm:px-8 py-8 space-y-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            onClick={handleBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 bg-white hover:bg-gray-100 px-3 py-2 rounded-lg border border-gray-200 shadow-sm transition"
-          >
-            <FiArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Back</span>
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
-            <p className="text-gray-600 mt-1">Manage your account settings and preferences</p>
+    <div className="min-h-screen bg-slate-50">
+      <div className="relative isolate overflow-hidden bg-gradient-to-br from-slate-900 via-sky-900 to-indigo-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-12 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="flex items-start gap-4">
+              <Button
+                onClick={handleBack}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg border border-white/30 shadow-sm transition"
+              >
+                <FiArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back</span>
+              </Button>
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-white/70">Account Centre</p>
+                <h1 className="text-3xl sm:text-4xl font-semibold mt-2">My Profile</h1>
+                <p className="text-sm text-white/70 mt-2 max-w-lg">
+                  Manage your personal information, security settings, and portfolio preferences in one place.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 min-w-[220px] md:min-w-[320px]">
+              <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-3 border border-white/20">
+                <p className="text-xs text-white/70">Account status</p>
+                <p className="text-lg font-semibold mt-1">{user.is_active ? 'Active' : 'Inactive'}</p>
+                <p className="text-[11px] text-white/60 mt-1">Signed in as {user.role}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-3 border border-white/20">
+                <p className="text-xs text-white/70">Profile completion</p>
+                <p className="text-lg font-semibold mt-1">{completionPercentage}%</p>
+                <p className="text-[11px] text-white/60 mt-1">Complete your contact details</p>
+              </div>
+            </div>
           </div>
         </div>
+        <div className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.4)_0,_transparent_55%)]" aria-hidden="true" />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Left Sidebar */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Profile Card */}
-          <Card className="p-6 text-center bg-white shadow-lg rounded-xl border border-gray-200">
-            <div className="relative inline-block mb-4">
-              <img
-                src={displayAvatar}
-                alt="Profile"
-                className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-xl mx-auto ring-4 ring-blue-100"
-                onError={(e) => {
-                  e.target.src = defaultAvatar;
-                }}
-              />
-              <div className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full shadow-lg">
-                <FiUser className="w-5 h-5" />
-              </div>
-            </div>
-            
-            <h2 className="text-2xl font-bold text-gray-900 mb-1">{user.full_name}</h2>
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <FiShield className="w-4 h-4 text-blue-600" />
-              <span className="text-blue-600 font-medium capitalize">{user.role}</span>
-            </div>
-
-            <div className="flex items-center justify-center gap-2 mb-6">
-              {user.is_active ? (
-                <div className="flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-full">
-                  <FiCheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-green-700 font-medium text-sm">Active</span>
+      <div className="relative z-10 -mt-10 pb-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-6">
+          <div className="grid lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 space-y-6">
+              <Card className="p-6 sm:p-7 text-center bg-white shadow-xl rounded-2xl border border-slate-100">
+                <div className="relative inline-block mb-5">
+                  <img
+                    src={displayAvatar}
+                    alt="Profile"
+                    className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-xl mx-auto ring-4 ring-sky-100"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = defaultAvatar;
+                    }}
+                  />
+                  <div className="absolute bottom-0 right-0 bg-sky-500 text-white p-2 rounded-full shadow-lg">
+                    <FiUser className="w-5 h-5" />
+                  </div>
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 bg-red-50 px-3 py-1.5 rounded-full">
-                  <FiAlertCircle className="w-4 h-4 text-red-600" />
-                  <span className="text-red-700 font-medium text-sm">Inactive</span>
+
+                <h2 className="text-2xl font-semibold text-slate-900 mb-1">{user.full_name}</h2>
+                <div className="flex items-center justify-center gap-2 mb-6">
+                  <FiShield className="w-4 h-4 text-sky-500" />
+                  <span className="text-sky-600 font-medium capitalize">{user.role}</span>
                 </div>
-              )}
+
+                <div className="flex items-center justify-center gap-2 mb-6">
+                  {user.is_active ? (
+                    <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-full">
+                      <FiCheckCircle className="w-4 h-4 text-emerald-600" />
+                      <span className="text-emerald-700 font-medium text-sm">Active</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-rose-50 px-3 py-1.5 rounded-full">
+                      <FiAlertCircle className="w-4 h-4 text-rose-600" />
+                      <span className="text-rose-700 font-medium text-sm">Inactive</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2 text-sm text-slate-500 mb-6">
+                  <div className="flex items-center gap-2 justify-center">
+                    <FiMail className="w-4 h-4" />
+                    <span>{user.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 justify-center">
+                    <FiPhone className="w-4 h-4" />
+                    <span>{user.phone || 'No phone number'}</span>
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  <Button
+                    onClick={handleEditClick}
+                    className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-600 text-white py-2.5 rounded-lg shadow-sm transition"
+                  >
+                    <FiEdit className="w-4 h-4" />
+                    Edit Profile
+                  </Button>
+
+                  <Button
+                    onClick={() => setPasswordModalOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 py-2.5 rounded-lg border border-slate-200 transition"
+                  >
+                    <FiLock className="w-4 h-4" />
+                    Change Password
+                  </Button>
+                </div>
+              </Card>
+
+              <Card className="p-6 bg-white shadow-md rounded-2xl border border-slate-100">
+                <h3 className="text-lg font-semibold text-slate-900 mb-5 flex items-center gap-2">
+                  <div className="p-2 bg-sky-100 rounded-lg">
+                    <FiActivity className="w-4 h-4 text-sky-500" />
+                  </div>
+                  Profile Completion
+                </h3>
+                <div className="mb-5">
+                  <div className="flex justify-between items-center mb-2 text-sm text-slate-600">
+                    <span>Overall Progress</span>
+                    <span className="text-sky-600 font-semibold">{completionPercentage}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-3">
+                    <div 
+                      className="bg-gradient-to-r from-sky-500 to-indigo-500 h-3 rounded-full transition-all duration-500"
+                      style={{ width: `${completionPercentage}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div className="space-y-2 text-sm text-slate-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Basic Information</span>
+                    <span className="text-emerald-500 font-semibold">Complete</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Phone Number</span>
+                    <span className={user.phone ? 'text-emerald-500 font-semibold' : 'text-amber-500 font-semibold'}>
+                      {user.phone ? 'Complete' : 'Missing'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Profile Photo</span>
+                    <span className={user.avatar && user.avatar !== defaultAvatar ? 'text-emerald-500 font-semibold' : 'text-amber-500 font-semibold'}>
+                      {user.avatar && user.avatar !== defaultAvatar ? 'Complete' : 'Pending'}
+                    </span>
+                  </div>
+                </div>
+              </Card>
             </div>
 
-            <Button
-              onClick={handleEditClick}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg shadow-md transition mb-3"
-            >
-              <FiEdit className="w-4 h-4" />
-              Edit Profile
-            </Button>
-
-            <Button
-              onClick={() => setPasswordModalOpen(true)}
-              className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 py-2.5 rounded-lg border border-gray-300 transition"
-            >
-              <FiLock className="w-4 h-4" />
-              Change Password
-            </Button>
-          </Card>
-
-          {/* Profile Completion */}
-          <Card className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 shadow-md rounded-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <FiActivity className="w-4 h-4 text-white" />
-              </div>
-              Profile Completion
-            </h3>
-            <div className="mb-3">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">Overall Progress</span>
-                <span className="text-sm font-bold text-blue-600">{completionPercentage}%</span>
-              </div>
-              <div className="w-full bg-white rounded-full h-3 shadow-inner">
-                <div 
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 h-3 rounded-full transition-all duration-500 shadow-sm"
-                  style={{ width: `${completionPercentage}%` }}
-                ></div>
-              </div>
-            </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700">✓ Basic Information</span>
-                <span className="text-green-600 font-semibold">Complete</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700">{user.phone ? '✓' : '○'} Phone Number</span>
-                <span className={user.phone ? 'text-green-600 font-semibold' : 'text-yellow-600 font-semibold'}>
-                  {user.phone ? 'Complete' : 'Pending'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700">{user.avatar && user.avatar !== defaultAvatar ? '✓' : '○'} Profile Photo</span>
-                <span className={user.avatar && user.avatar !== defaultAvatar ? 'text-green-600 font-semibold' : 'text-yellow-600 font-semibold'}>
-                  {user.avatar && user.avatar !== defaultAvatar ? 'Complete' : 'Pending'}
-                </span>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Tabs */}
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`flex items-center gap-2 px-5 py-3 rounded-lg font-medium transition whitespace-nowrap ${
-                activeTab === 'overview'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              <FiUser className="w-4 h-4" />
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab('security')}
-              className={`flex items-center gap-2 px-5 py-3 rounded-lg font-medium transition whitespace-nowrap ${
-                activeTab === 'security'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              <FiShield className="w-4 h-4" />
-              Security
-            </button>
-            <button
-              onClick={() => setActiveTab('activity')}
-              className={`flex items-center gap-2 px-5 py-3 rounded-lg font-medium transition whitespace-nowrap ${
-                activeTab === 'activity'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              <FiActivity className="w-4 h-4" />
-              Activity
-            </button>
-          </div>
-
-          {/* Tab Content */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Contact Information */}
-              <Card className="p-6 bg-white shadow-lg rounded-xl border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <FiMail className="w-5 h-5 text-blue-600" />
+            <div className="lg:col-span-2 space-y-6">
+              <Card className="p-6 bg-white shadow-md rounded-2xl border border-slate-100">
+                <h3 className="text-lg font-semibold text-slate-900 mb-5 flex items-center gap-2">
+                  <div className="p-2 bg-sky-100 rounded-lg">
+                    <FiMail className="w-5 h-5 text-sky-500" />
                   </div>
                   Contact Information
                 </h3>
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <FiMail className="w-4 h-4 text-blue-600" />
-                      </div>
-                      <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Email Address</p>
-                    </div>
-                    <p className="text-gray-900 font-medium pl-11">{user.email}</p>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="text-xs uppercase text-slate-500 font-semibold mb-2">Email Address</div>
+                    <p className="text-slate-900 font-medium">{user.email}</p>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <FiPhone className="w-4 h-4 text-green-600" />
-                      </div>
-                      <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Phone Number</p>
-                    </div>
-                    <p className="text-gray-900 font-medium pl-11">{user.phone || "Not provided"}</p>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="text-xs uppercase text-slate-500 font-semibold mb-2">Phone Number</div>
+                    <p className="text-slate-900 font-medium">{user.phone || 'Not provided'}</p>
                   </div>
                 </div>
               </Card>
 
-              {/* Account Information */}
-              <Card className="p-6 bg-white shadow-lg rounded-xl border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
+              <Card className="p-6 bg-white shadow-md rounded-2xl border border-slate-100">
+                <h3 className="text-lg font-semibold text-slate-900 mb-5 flex items-center gap-2">
                   <div className="p-2 bg-indigo-100 rounded-lg">
-                    <FiCalendar className="w-5 h-5 text-indigo-600" />
+                    <FiCalendar className="w-5 h-5 text-indigo-500" />
                   </div>
                   Account Details
                 </h3>
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-2 bg-purple-100 rounded-lg">
-                        <FiUser className="w-4 h-4 text-purple-600" />
-                      </div>
-                      <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">User ID</p>
-                    </div>
-                    <p className="text-gray-900 font-mono text-sm pl-11">{user.id?.substring(0, 13)}...</p>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="text-xs uppercase text-slate-500 font-semibold mb-2">User ID</div>
+                    <p className="text-slate-900 font-mono text-sm">{user.id?.substring(0, 13)}...</p>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <FiShield className="w-4 h-4 text-blue-600" />
-                      </div>
-                      <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Role</p>
-                    </div>
-                    <p className="text-gray-900 font-medium capitalize pl-11">{user.role}</p>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="text-xs uppercase text-slate-500 font-semibold mb-2">Role</div>
+                    <p className="text-slate-900 font-medium capitalize">{user.role}</p>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <FiCalendar className="w-4 h-4 text-green-600" />
-                      </div>
-                      <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Member Since</p>
-                    </div>
-                    <p className="text-gray-900 font-medium pl-11">
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="text-xs uppercase text-slate-500 font-semibold mb-2">Member Since</div>
+                    <p className="text-slate-900 font-medium">
                       {user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
-                      }) : "N/A"}
+                      }) : 'N/A'}
                     </p>
                   </div>
-                  <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-2 bg-orange-100 rounded-lg">
-                        <FiClock className="w-4 h-4 text-orange-600" />
-                      </div>
-                      <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Last Updated</p>
-                    </div>
-                    <p className="text-gray-900 font-medium pl-11">
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="text-xs uppercase text-slate-500 font-semibold mb-2">Last Updated</div>
+                    <p className="text-slate-900 font-medium">
                       {user.updated_at ? new Date(user.updated_at).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
-                      }) : "N/A"}
+                      }) : 'N/A'}
                     </p>
                   </div>
                 </div>
               </Card>
+
+              <Card className="p-6 bg-white shadow-md rounded-2xl border border-slate-100">
+                <h3 className="text-lg font-semibold text-slate-900 mb-5 flex items-center gap-2">
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <FiLock className="w-5 h-5 text-emerald-500" />
+                  </div>
+                  Password & Security Settings
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-5 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-emerald-100 rounded-lg">
+                        <FiLock className="w-5 h-5 text-emerald-500" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">Password</p>
+                        <p className="text-sm text-slate-600">Last changed 30 days ago</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => setPasswordModalOpen(true)}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2 rounded-lg shadow-sm transition"
+                    >
+                      Change
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between p-5 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-indigo-100 rounded-lg">
+                        <FiShield className="w-5 h-5 text-indigo-500" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">Two-Factor Authentication</p>
+                        <p className="text-sm text-slate-600">Add an extra layer of security</p>
+                      </div>
+                    </div>
+                    <Button className="bg-white hover:bg-slate-100 text-slate-700 px-5 py-2 rounded-lg border border-slate-200 shadow-sm transition">
+                      Enable
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6 bg-white shadow-md rounded-2xl border border-slate-100">
+                <h3 className="text-lg font-semibold text-slate-900 mb-5 flex items-center gap-2">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <FiActivity className="w-5 h-5 text-purple-500" />
+                  </div>
+                  Recent Activity Log
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-4 p-4 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-100">
+                    <div className="p-2.5 bg-sky-500 text-white rounded-full flex-shrink-0">
+                      <FiSettings className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-900">Profile Updated</p>
+                      <p className="text-sm text-slate-600">You updated your profile information</p>
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                        <FiClock className="w-3 h-3" /> 2 hours ago
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4 p-4 bg-gradient-to-br from-emerald-50 to-white rounded-xl border border-emerald-100">
+                    <div className="p-2.5 bg-emerald-500 text-white rounded-full flex-shrink-0">
+                      <FiCheckCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-900">Login Successful</p>
+                      <p className="text-sm text-slate-600">Logged in from Chrome on macOS</p>
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                        <FiClock className="w-3 h-3" /> 1 day ago
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4 p-4 bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-100">
+                    <div className="p-2.5 bg-indigo-500 text-white rounded-full flex-shrink-0">
+                      <FiShield className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-900">Security Settings Changed</p>
+                      <p className="text-sm text-slate-600">Password updated successfully</p>
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                        <FiClock className="w-3 h-3" /> 3 days ago
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
             </div>
-          )}
-
-          {activeTab === 'security' && (
-            <Card className="p-6 bg-white shadow-lg rounded-xl border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <FiLock className="w-5 h-5 text-green-600" />
-                </div>
-                Password & Security Settings
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-100 rounded-lg">
-                      <FiLock className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">Password</p>
-                      <p className="text-sm text-gray-500">Last changed 30 days ago</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => setPasswordModalOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-sm transition"
-                  >
-                    Change
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-purple-100 rounded-lg">
-                      <FiShield className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">Two-Factor Authentication</p>
-                      <p className="text-sm text-gray-500">Add an extra layer of security</p>
-                    </div>
-                  </div>
-                  <Button className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-5 py-2 rounded-lg shadow-sm transition">
-                    Enable
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {activeTab === 'activity' && (
-            <Card className="p-6 bg-white shadow-lg rounded-xl border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <FiActivity className="w-5 h-5 text-purple-600" />
-                </div>
-                Recent Activity Log
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-start gap-4 p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 hover:shadow-md transition">
-                  <div className="p-2.5 bg-blue-600 rounded-full flex-shrink-0">
-                    <FiSettings className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-900">Profile Updated</p>
-                    <p className="text-sm text-gray-600">You updated your profile information</p>
-                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <FiClock className="w-3 h-3" />
-                      2 hours ago
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4 p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200 hover:shadow-md transition">
-                  <div className="p-2.5 bg-green-600 rounded-full flex-shrink-0">
-                    <FiCheckCircle className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-900">Login Successful</p>
-                    <p className="text-sm text-gray-600">Logged in from Chrome on MacOS</p>
-                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <FiClock className="w-3 h-3" />
-                      1 day ago
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4 p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200 hover:shadow-md transition">
-                  <div className="p-2.5 bg-purple-600 rounded-full flex-shrink-0">
-                    <FiShield className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-900">Security Settings Changed</p>
-                    <p className="text-sm text-gray-600">Password was updated successfully</p>
-                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <FiClock className="w-3 h-3" />
-                      3 days ago
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
+          </div>
         </div>
       </div>
 
@@ -585,8 +556,8 @@ const ProfilePage = () => {
           onSubmit={handleSave}
           submitDisabled={saving || uploadingAvatar}
           submitText={
-            saving ? "Saving Changes..." : 
-            uploadingAvatar ? "Uploading Avatar..." : 
+            saving ? "Saving Changes..." :
+            uploadingAvatar ? "Uploading Avatar..." :
             "Save Changes"
           }
         >
@@ -595,11 +566,12 @@ const ProfilePage = () => {
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
                 <img
-                  src={avatarPreview || editData.avatar || defaultAvatar}
+                  src={avatarPreview || resolveAvatarUrl(editData.avatar)}
                   alt="Preview"
                   className="w-28 h-28 rounded-full object-cover border-4 border-blue-100 shadow-lg"
                   onError={(e) => {
-                    e.target.src = defaultAvatar;
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = defaultAvatar;
                   }}
                 />
                 {avatarPreview && (
@@ -686,7 +658,7 @@ const ProfilePage = () => {
                 {showPasswords.current ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
               </button>
             </div>
-            
+
             <div className="relative">
               <Input
                 label="New Password"
@@ -705,7 +677,7 @@ const ProfilePage = () => {
                 {showPasswords.new ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
               </button>
             </div>
-            
+
             <div className="relative">
               <Input
                 label="Confirm New Password"
@@ -724,7 +696,7 @@ const ProfilePage = () => {
                 {showPasswords.confirm ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
               </button>
             </div>
-            
+
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <FiShield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />

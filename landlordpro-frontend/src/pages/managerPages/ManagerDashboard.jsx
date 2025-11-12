@@ -1,6 +1,6 @@
 // src/pages/ManagerDashboard.jsx
-import React from 'react';
-import { Card } from '../../components/';
+import React, { useMemo } from 'react';
+import { Card, Spinner, Button } from '../../components';
 import {
   PieChart,
   Pie,
@@ -11,192 +11,348 @@ import {
   Line,
   XAxis,
   YAxis,
-  Legend
+  CartesianGrid,
+  Legend,
 } from 'recharts';
-import { Home, Users, CalendarCheck } from 'lucide-react';
+import {
+  Home,
+  Users,
+  CalendarCheck,
+  RefreshCcw,
+  Building2,
+  CreditCard,
+} from 'lucide-react';
+import useManagerPortfolio from '../../hooks/useManagerPortfolio';
 
-// Data
-const occupancyData = [
-  { name: 'Occupied', value: 75 },
-  { name: 'Available', value: 25 },
-];
+const COLORS = ['#14B8A6', '#F87171', '#FBBF24'];
 
-const COLORS = ['#14B8A6', '#F87171'];
+const buildMonthlySeries = (items, getDate, getValue, months = 6) => {
+  const now = new Date();
+  const series = [];
 
-const metrics = [
-  {
-    title: 'Total Properties',
-    value: '12',
-    icon: <Home className="w-6 h-6 text-teal-500" />,
-    bg: 'bg-teal-50 dark:bg-teal-900/20',
-    trend: [10, 11, 12, 12, 12], // example trend
-    color: '#14B8A6',
-  },
-  {
-    title: 'Total Tenants',
-    value: '45',
-    icon: <Users className="w-6 h-6 text-blue-500" />,
-    bg: 'bg-blue-50 dark:bg-blue-900/20',
-    trend: [40, 42, 43, 45, 45],
-    color: '#3B82F6',
-  },
-  {
-    title: 'Upcoming Payments',
-    value: '5',
-    icon: <CalendarCheck className="w-6 h-6 text-amber-500" />,
-    bg: 'bg-amber-50 dark:bg-amber-900/20',
-    trend: [3, 4, 5, 5, 5],
-    color: '#F59E0B',
-  },
-];
+  for (let i = months - 1; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${date.getFullYear()}-${date.getMonth()}`;
+    series.push({
+      key,
+      month: date.toLocaleString('default', { month: 'short' }),
+      amount: 0,
+      count: 0,
+    });
+  }
 
-const paymentTrend = [
-  { month: 'Jan', occupied: 70, payments: 4 },
-  { month: 'Feb', occupied: 72, payments: 6 },
-  { month: 'Mar', occupied: 74, payments: 5 },
-  { month: 'Apr', occupied: 75, payments: 7 },
-];
+  items.forEach((item) => {
+    const date = getDate(item);
+    if (!date || Number.isNaN(date.getTime())) return;
 
-const tenants = [
-  { name: 'Alice Brown', unit: 'Unit 201', lease: '2025-10-31', balance: 200 },
-  { name: 'Bob Green', unit: 'Unit 202', lease: '2025-11-15', balance: 0 },
-  { name: 'Charlie Black', unit: 'Unit 203', lease: '2025-12-10', balance: 350 },
-];
+    const key = `${date.getFullYear()}-${date.getMonth()}`;
+    const entry = series.find((item) => item.key === key);
+    if (entry) {
+      entry.amount += Number(getValue(item)) || 0;
+      entry.count += 1;
+    }
+  });
+
+  return series.map(({ month, amount, count }) => ({
+    month,
+    payments: Number(amount.toFixed(2)),
+    leases: count,
+  }));
+};
 
 const ManagerDashboard = () => {
+  const {
+    properties,
+    locals,
+    leases,
+    payments,
+    loading,
+    refresh,
+  } = useManagerPortfolio();
+
+  const propertyNameMap = useMemo(
+    () =>
+      new Map(properties.map((property) => [property.id, property.name || 'Unnamed Property'])),
+    [properties]
+  );
+
+  const localMap = useMemo(
+    () =>
+      new Map(
+        locals.map((local) => [
+          local.id,
+          {
+            ...local,
+            reference: local.reference_code || local.referenceCode || 'Unknown Unit',
+          },
+        ])
+      ),
+    [locals]
+  );
+
+  const totalProperties = properties.length;
+  const totalUnits = locals.length;
+  const occupiedUnits = locals.filter((local) => local.status === 'occupied').length;
+  const availableUnits = locals.filter((local) => local.status === 'available').length;
+  const maintenanceUnits = totalUnits - occupiedUnits - availableUnits;
+  const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
+
+  const uniqueTenantCount = useMemo(() => {
+    const tenantIds = new Set();
+    leases.forEach((lease) => {
+      if (lease?.tenant?.id) tenantIds.add(lease.tenant.id);
+    });
+    return tenantIds.size;
+  }, [leases]);
+
+  const upcomingPayments = useMemo(() => {
+    const now = new Date();
+    const nextMonth = new Date(now);
+    nextMonth.setDate(now.getDate() + 30);
+    return payments.filter((payment) => {
+      const end = new Date(payment.endDate || payment.end_date || payment.created_at);
+      if (Number.isNaN(end.getTime())) return false;
+      return end >= now && end <= nextMonth;
+    }).length;
+  }, [payments]);
+
+  const paymentTrend = useMemo(
+    () =>
+      buildMonthlySeries(
+        payments,
+        (payment) => new Date(payment.endDate || payment.end_date || payment.created_at),
+        (payment) => payment.amount
+      ),
+    [payments]
+  );
+
+  const occupancyData = useMemo(
+    () => [
+      { name: 'Occupied', value: occupiedUnits },
+      { name: 'Available', value: availableUnits },
+      { name: 'Maintenance', value: maintenanceUnits },
+    ],
+    [occupiedUnits, availableUnits, maintenanceUnits]
+  );
+
+  const recentTenants = useMemo(() => {
+    const sorted = [...leases].sort((a, b) => {
+      const aDate = new Date(a.updatedAt || a.startDate || a.created_at || 0).getTime();
+      const bDate = new Date(b.updatedAt || b.startDate || b.created_at || 0).getTime();
+      return bDate - aDate;
+    });
+
+    return sorted.slice(0, 8).map((lease) => {
+      const localInfo = lease.localId ? localMap.get(lease.localId) : null;
+      const propertyName = lease.propertyId ? propertyNameMap.get(lease.propertyId) : '—';
+      return {
+        id: lease.id,
+        tenant: lease.tenant?.name || 'Unknown tenant',
+        unit: localInfo?.reference || lease.local?.referenceCode || '—',
+        property: propertyName || '—',
+        endDate: lease.endDate || lease.end_date,
+        status: lease.status || 'active',
+      };
+    });
+  }, [leases, localMap, propertyNameMap]);
+
+  const totalPaymentAmount = payments.reduce(
+    (sum, payment) => sum + (Number(payment.amount) || 0),
+    0
+  );
+
+  const metricCards = [
+    {
+      title: 'Properties',
+      value: totalProperties,
+      subtitle: `${totalUnits} managed units`,
+      icon: <Home className="w-6 h-6 text-teal-500" />,
+      bg: 'bg-teal-50',
+    },
+    {
+      title: 'Tenants',
+      value: uniqueTenantCount,
+      subtitle: `${leases.length} active leases`,
+      icon: <Users className="w-6 h-6 text-blue-500" />,
+      bg: 'bg-blue-50',
+    },
+    {
+      title: 'Upcoming Payments',
+      value: upcomingPayments,
+      subtitle: `FRW ${totalPaymentAmount.toLocaleString()} total inflow`,
+      icon: <CalendarCheck className="w-6 h-6 text-amber-500" />,
+      bg: 'bg-amber-50',
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full py-16">
+        <Spinner />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">
-        Manager Dashboard
-      </h1>
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Manager Dashboard</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Real-time overview of your assigned portfolio
+          </p>
+        </div>
+        <Button
+          className="self-start flex items-center gap-2 bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-md shadow-sm transition"
+          onClick={refresh}
+        >
+          <RefreshCcw className="w-4 h-4" />
+          Refresh Data
+        </Button>
+      </div>
 
-      {/* Metric Cards with Trend Sparklines */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {metrics.map((m, i) => (
-          <Card
-            key={i}
-            className={`flex flex-col justify-between p-5 rounded-xl shadow hover:shadow-lg transition ${m.bg}`}
-          >
-            <div className="flex items-center justify-between">
+        {metricCards.map((metric) => (
+          <Card key={metric.title} className={`p-6 rounded-xl shadow-sm border ${metric.bg}`}>
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{m.title}</p>
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{m.value}</h2>
+                <p className="text-sm text-gray-500">{metric.title}</p>
+                <h2 className="text-2xl font-bold text-gray-800 mt-1">{metric.value}</h2>
+                <p className="text-xs text-gray-500 mt-2">{metric.subtitle}</p>
               </div>
-              {m.icon}
-            </div>
-            <div className="mt-3 w-full h-12">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={m.trend.map((v, idx) => ({ idx, value: v }))}>
-                  <Line
-                    type="monotone"
-                    dataKey="value"
-                    stroke={m.color}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <XAxis dataKey="idx" hide />
-                  <YAxis hide />
-                </LineChart>
-              </ResponsiveContainer>
+              <div className="p-3 bg-white rounded-lg shadow-sm border">{metric.icon}</div>
             </div>
           </Card>
         ))}
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Occupancy Pie Chart */}
-        <Card className="p-5">
-          <h2 className="font-semibold text-gray-700 dark:text-gray-200 mb-4">
-            Occupancy Rate
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <Card className="p-6 xl:col-span-2">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-teal-500" />
+            Monthly Income & Lease Activity
           </h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={occupancyData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              >
-                {occupancyData.map((entry, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} stroke="#fff" strokeWidth={2} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          {paymentTrend.length > 0 ? (
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={paymentTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="month" stroke="#9CA3AF" />
+                <YAxis yAxisId="left" stroke="#9CA3AF" />
+                <YAxis yAxisId="right" orientation="right" stroke="#9CA3AF" />
+                <Tooltip />
+                <Legend />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="payments"
+                  name="Payments (FRW)"
+                  stroke="#14B8A6"
+                  strokeWidth={3}
+                  dot={{ r: 4 }}
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="leases"
+                  name="New Leases"
+                  stroke="#6366F1"
+                  strokeWidth={3}
+                  dot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="py-12 text-center text-gray-500">No payment activity yet.</div>
+          )}
         </Card>
 
-        {/* Combined Occupancy vs Payments */}
-        <Card className="p-5">
-          <h2 className="font-semibold text-gray-700 dark:text-gray-200 mb-4">
-            Occupancy vs Payments
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-blue-500" />
+            Occupancy Snapshot
           </h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={paymentTrend}>
-              <XAxis dataKey="month" stroke="#9CA3AF" />
-              <YAxis yAxisId="left" stroke="#9CA3AF" />
-              <YAxis yAxisId="right" orientation="right" stroke="#9CA3AF" />
-              <Tooltip />
-              <Legend />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="occupied"
-                stroke="#14B8A6"
-                strokeWidth={2}
-                name="Occupied Units"
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="payments"
-                stroke="#F87171"
-                strokeWidth={2}
-                name="Payments"
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {totalUnits > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={occupancyData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={95}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {occupancyData.map((entry, index) => (
+                      <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-4 text-center">
+                <p className="text-3xl font-bold text-gray-900">{occupancyRate}%</p>
+                <p className="text-sm text-gray-500">
+                  {occupiedUnits} occupied • {availableUnits} available • {maintenanceUnits}{' '}
+                  maintenance
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="py-12 text-center text-gray-500">No unit information available.</div>
+          )}
         </Card>
       </div>
 
-      {/* Recent Tenants Table */}
-      <Card className="p-5">
-        <h2 className="font-semibold text-gray-700 dark:text-gray-200 mb-4">
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <Users className="w-5 h-5 text-emerald-500" />
           Recent Tenants
         </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead className="bg-gray-100 dark:bg-gray-800">
-              <tr>
-                <th className="p-3">Name</th>
-                <th className="p-3">Unit</th>
-                <th className="p-3">Lease End</th>
-                <th className="p-3">Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tenants.map((tenant, i) => (
-                <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                  <td className="p-3 border-b">{tenant.name}</td>
-                  <td className="p-3 border-b">{tenant.unit}</td>
-                  <td className="p-3 border-b">{tenant.lease}</td>
-                  <td
-                    className={`p-3 border-b font-semibold ${
-                      tenant.balance === 0 ? 'text-teal-500' : 'text-rose-500'
-                    }`}
-                  >
-                    ${tenant.balance}
-                  </td>
+        {recentTenants.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm text-gray-700">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th className="p-3 text-left">Tenant</th>
+                  <th className="p-3 text-left">Unit</th>
+                  <th className="p-3 text-left">Property</th>
+                  <th className="p-3 text-left">Lease Ends</th>
+                  <th className="p-3 text-left">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {recentTenants.map((tenant) => (
+                  <tr key={tenant.id} className="border-b last:border-none">
+                    <td className="p-3 font-medium text-gray-800">{tenant.tenant}</td>
+                    <td className="p-3">{tenant.unit}</td>
+                    <td className="p-3">{tenant.property}</td>
+                    <td className="p-3">
+                      {tenant.endDate
+                        ? new Date(tenant.endDate).toLocaleDateString()
+                        : '—'}
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          tenant.status === 'active'
+                            ? 'bg-teal-100 text-teal-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}
+                      >
+                        {tenant.status.charAt(0).toUpperCase() + tenant.status.slice(1)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="py-12 text-center text-gray-500">No tenant activity to display.</div>
+        )}
       </Card>
     </div>
   );

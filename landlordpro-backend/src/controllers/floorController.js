@@ -1,4 +1,5 @@
 const floorService = require('../services/floorService');
+const { Property } = require('../models');
 
 /**
  * Helper for unified async error handling
@@ -62,7 +63,20 @@ exports.getAllFloors = handleAsync(async (req, res) => {
 // ================================
 exports.getFloorsByPropertyId = handleAsync(async (req, res) => {
   const { propertyId } = req.params;
-  
+  const user = req.user;
+
+  const property = await Property.findByPk(propertyId, {
+    attributes: ['id', 'name', 'location', 'manager_id'],
+  });
+
+  if (!property) {
+    return res.status(404).json({ success: false, message: 'Property not found.' });
+  }
+
+  if (user?.role === 'manager' && property.manager_id !== user.id) {
+    return res.status(403).json({ success: false, message: 'Access denied: You are not assigned to this property.' });
+  }
+
   const floors = await floorService.getFloorsByPropertyId(propertyId);
 
   const formattedFloors = floors.map((floor) => {
@@ -78,9 +92,9 @@ exports.getFloorsByPropertyId = handleAsync(async (req, res) => {
       name: floor.name,
       level_number: floor.level_number,
       property_id: floor.property_id,
-      property_name: floor.propertyForFloor?.name || null,
-      property_location: floor.propertyForFloor?.location || null,
-      locals: locals,
+      property_name: floor.propertyForFloor?.name || property.name,
+      property_location: floor.propertyForFloor?.location || property.location,
+      locals,
       locals_count: total,
       locals_details: locals.map(local => ({
         id: local.id,
@@ -89,7 +103,6 @@ exports.getFloorsByPropertyId = handleAsync(async (req, res) => {
         area: local.area || null,
         rent_price: local.rent_price || null
       })),
-      // Enhanced occupancy stats
       occupancy: {
         total,
         occupied,
@@ -100,17 +113,14 @@ exports.getFloorsByPropertyId = handleAsync(async (req, res) => {
     };
   });
 
-  // Get property info from first floor (all floors belong to same property)
-  const propertyInfo = floors.length > 0 ? {
-    id: floors[0]?.propertyForFloor?.id,
-    name: floors[0]?.propertyForFloor?.name,
-    location: floors[0]?.propertyForFloor?.location,
-  } : null;
-
   res.status(200).json({
     success: true,
     total: formattedFloors.length,
-    property: propertyInfo,
+    property: {
+      id: property.id,
+      name: property.name,
+      location: property.location,
+    },
     data: formattedFloors,
   });
 });
@@ -255,8 +265,19 @@ exports.getFloorOccupancy = handleAsync(async (req, res) => {
 // All floors occupancy (with optional property filter)
 exports.getAllFloorsOccupancy = handleAsync(async (req, res) => {
   const { propertyId } = req.query;
+  const user = req.user;
+
+  if (propertyId && user?.role === 'manager') {
+    const property = await Property.findByPk(propertyId, { attributes: ['id', 'manager_id'] });
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found.' });
+    }
+    if (property.manager_id !== user.id) {
+      return res.status(403).json({ success: false, message: 'Access denied: You are not assigned to this property.' });
+    }
+  }
   
-  const report = await floorService.getAllFloorsOccupancy(propertyId || null);
+  const report = await floorService.getAllFloorsOccupancy(propertyId || null, user);
   
   // Ensure consistent response structure for all items
   const formattedReport = report.map(item => ({

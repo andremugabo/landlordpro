@@ -14,15 +14,37 @@ export const clearToken = () => localStorage.removeItem('token');
 /* ---------------------------
    👤 User Session Management
 ---------------------------- */
-export const saveLoggedInUser = (user) =>
-  sessionStorage.setItem('authenticatedUser', JSON.stringify(user));
-
-export const getLoggedInUser = () => {
-  const user = sessionStorage.getItem('authenticatedUser');
-  return user ? JSON.parse(user) : null;
+export const saveLoggedInUser = (user) => {
+  if (!user) {
+    sessionStorage.removeItem('authenticatedUser');
+    localStorage.removeItem('user');
+    return;
+  }
+  const serialised = JSON.stringify(user);
+  sessionStorage.setItem('authenticatedUser', serialised);
+  localStorage.setItem('user', serialised);
 };
 
-export const clearLoggedInUser = () => sessionStorage.removeItem('authenticatedUser');
+export const getLoggedInUser = () => {
+  const user = sessionStorage.getItem('authenticatedUser') || localStorage.getItem('user');
+  if (!user) return null;
+
+  try {
+    const parsed = JSON.parse(user);
+    if (parsed?.role) {
+      parsed.role = String(parsed.role).toLowerCase();
+    }
+    return parsed;
+  } catch (error) {
+    console.error('Failed to parse stored user:', error);
+    return null;
+  }
+};
+
+export const clearLoggedInUser = () => {
+  sessionStorage.removeItem('authenticatedUser');
+  localStorage.removeItem('user');
+};
 
 /* ---------------------------
    🔐 Authentication Checks

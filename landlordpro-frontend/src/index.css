@@ -52,4 +52,7 @@
   }
   
 
-  
+  /* Force RGB in dark mode */
+.dark .bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, #0d9488, #1e40af) !important;
+}

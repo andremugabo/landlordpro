@@ -1,20 +1,19 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { 
-  getAllLocals, 
-  createLocal, 
-  updateLocal, 
-  deleteLocal,  // <-- added
-  restoreLocal, 
-  updateLocalStatus  
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  getAllLocals,
+  createLocal,
+  updateLocal,
+  deleteLocal,
+  restoreLocal,
+  updateLocalStatus
 } from '../../services/localService';
-import { getAllProperties } from '../../services/propertyService';
 import { Button, Modal, Input, Card, Select } from '../../components';
 import { FiEdit, FiPlus, FiTrash, FiSearch, FiRefreshCcw } from 'react-icons/fi';
 import { showSuccess, showError, showInfo } from '../../utils/toastHelper';
+import useAccessibleProperties from '../../hooks/useAccessibleProperties';
 
 const LocalPage = () => {
   const [locals, setLocals] = useState([]);
-  const [properties, setProperties] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedLocal, setSelectedLocal] = useState(null);
   const [editData, setEditData] = useState({ reference_code: '', status: 'available', size_m2: '', property_id: '' });
@@ -22,37 +21,94 @@ const LocalPage = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedPropertyId, setSelectedPropertyId] = useState('');
+
+  const {
+    isManager,
+    properties,
+    propertyOptions,
+    loading: loadingProperties,
+  } = useAccessibleProperties();
+
+  const statusOptions = useMemo(
+    () => [
+      { value: 'available', label: 'Available' },
+      { value: 'occupied', label: 'Occupied' },
+      { value: 'maintenance', label: 'Maintenance' },
+    ],
+    []
+  );
+
+  // Automatically select the only property for a manager
+  useEffect(() => {
+    if (isManager) {
+      if (properties.length === 1) {
+        setSelectedPropertyId(properties[0].id);
+      } else if (properties.length === 0) {
+        setSelectedPropertyId('');
+      }
+    }
+  }, [isManager, properties]);
+
+  const selectedPropertyOption = useMemo(
+    () => propertyOptions.find((option) => option.value === selectedPropertyId) ?? null,
+    [propertyOptions, selectedPropertyId]
+  );
 
   // Fetch locals
-  const fetchLocals = async (pageNumber = 1) => {
-    try {
-      setLoading(true);
-      const data = await getAllLocals(pageNumber, 10);
-      const { locals, totalPages, page } = data;
-      setLocals(locals);
-      setTotalPages(totalPages);
-      setPage(page);
-    } catch (err) {
-      showError(err?.message || 'Failed to fetch locals');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchLocals = useCallback(
+    async (pageNumber = 1, propertyId = selectedPropertyId) => {
+      if (isManager && !propertyId) {
+        setLocals([]);
+        setTotalPages(1);
+        setLoading(false);
+        return;
+      }
 
-  // Fetch properties for Select dropdown
-  const fetchProperties = async () => {
-    try {
-      const data = await getAllProperties(1, 100);
-      setProperties(data.properties || []);
-    } catch (err) {
-      showError(err?.message || 'Failed to fetch properties');
-    }
-  };
+      try {
+        setLoading(true);
 
+        const params = { page: pageNumber, limit: 10 };
+        if (propertyId) {
+          params.propertyId = propertyId;
+        }
+
+        const response = await getAllLocals(params);
+        const {
+          locals: fetchedLocals = [],
+          totalPages: responseTotalPages = 1,
+          page: responsePage = pageNumber,
+        } = response || {};
+
+        setLocals(Array.isArray(fetchedLocals) ? fetchedLocals : []);
+        setTotalPages(responseTotalPages || 1);
+
+        if (responsePage && responsePage !== pageNumber) {
+          setPage(responsePage);
+        }
+      } catch (err) {
+        console.error('Failed to fetch locals:', err);
+        showError(err?.message || 'Failed to fetch locals');
+        setLocals([]);
+        setTotalPages(1);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [isManager, selectedPropertyId]
+  );
+
+  // Initial and property-based fetch
   useEffect(() => {
-    fetchLocals(page);
-    fetchProperties();
-  }, [page]);
+    setPage(1);
+    fetchLocals(1, selectedPropertyId);
+  }, [selectedPropertyId, fetchLocals]);
+
+  // Pagination fetch
+  useEffect(() => {
+    if (page === 1) return;
+    fetchLocals(page, selectedPropertyId);
+  }, [page, selectedPropertyId, fetchLocals]);
 
   const handleEditClick = (local) => {
     setSelectedLocal(local);
@@ -80,12 +136,24 @@ const LocalPage = () => {
       } else {
         await createLocal({ reference_code, status, size_m2, property_id });
         showSuccess('Local added successfully!');
-        setPage(1);
       }
-      fetchLocals(page);
+
       setModalOpen(false);
       setSelectedLocal(null);
       setEditData({ reference_code: '', status: 'available', size_m2: '', property_id: '' });
+
+      const targetPropertyId = property_id || selectedPropertyId;
+      const targetPage = selectedLocal ? page : 1;
+
+      if (!selectedLocal) {
+        setPage(1);
+      }
+
+      if (property_id && property_id !== selectedPropertyId) {
+        setSelectedPropertyId(property_id);
+      } else {
+        fetchLocals(targetPage, targetPropertyId);
+      }
     } catch (err) {
       showError(err?.message || 'Failed to save local');
     }
@@ -94,9 +162,9 @@ const LocalPage = () => {
   const handleDelete = async (local) => {
     if (!window.confirm('Are you sure you want to delete this local?')) return;
     try {
-      await softDeleteLocal(local.id);
+      await deleteLocal(local.id);
       showInfo('Local deleted successfully.');
-      fetchLocals(page);
+      fetchLocals(page, selectedPropertyId);
     } catch (err) {
       showError(err?.message || 'Failed to delete local');
     }
@@ -106,7 +174,7 @@ const LocalPage = () => {
     try {
       await restoreLocal(local.id);
       showSuccess('Local restored successfully.');
-      fetchLocals(page);
+      fetchLocals(page, selectedPropertyId);
     } catch (err) {
       showError(err?.message || 'Failed to restore local');
     }
@@ -116,7 +184,7 @@ const LocalPage = () => {
     try {
       await updateLocalStatus(local.id, newStatus);
       showSuccess('Status updated successfully.');
-      fetchLocals(page);
+      fetchLocals(page, selectedPropertyId);
     } catch (err) {
       showError(err?.message || 'Failed to update status');
     }
@@ -138,19 +206,46 @@ const LocalPage = () => {
           <h1 className="text-lg sm:text-xl font-semibold text-gray-800">Locals Management</h1>
           <p className="text-sm text-gray-500">View, add, or manage units within properties</p>
         </div>
+        {/* Property filter */}
+        <div className="w-full sm:w-72">
+          <Select
+            label="Filter by Property"
+            value={selectedPropertyOption}
+            options={propertyOptions}
+            isClearable={!isManager}
+            isDisabled={loadingProperties || (isManager && properties.length <= 1)}
+            placeholder={isManager ? 'Select your property...' : 'All properties'}
+            onChange={(option) => {
+              const nextValue = option?.value ?? '';
+              setSelectedPropertyId(nextValue);
+            }}
+          />
+        </div>
         <Button
           className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm transition w-full sm:w-auto justify-center"
           onClick={() => {
             setSelectedLocal(null);
-            setEditData({ reference_code: '', status: 'available', size_m2: '', property_id: '' });
+            setEditData({
+              reference_code: '',
+              status: 'available',
+              size_m2: '',
+              property_id: selectedPropertyId || (properties[0]?.id ?? ''),
+            });
             setModalOpen(true);
           }}
+          disabled={isManager && properties.length === 0}
         >
           <FiPlus className="text-base" />
           <span>Add Local</span>
         </Button>
       </div>
 
+      {isManager && !loadingProperties && properties.length === 0 ? (
+        <Card className="p-6 text-center text-gray-600">
+          You are not assigned to any property yet. Please contact an administrator.
+        </Card>
+      ) : (
+        <>
       {/* Search */}
       <div className="relative w-full">
         <FiSearch className="absolute left-3 top-3 text-gray-400" />
@@ -189,15 +284,20 @@ const LocalPage = () => {
                       <td className="p-3 font-medium text-gray-800">{local.reference_code}</td>
                       <td className="p-3">{local.property?.name || '-'}</td>
                       <td className="p-3">{local.size_m2 || '-'}</td>
-                      <td className="p-3">
+                      <td className="p-3 min-w-[180px]">
                         <Select
-                          value={local.status}
-                          options={[
-                            { value: 'available', label: 'Available' },
-                            { value: 'occupied', label: 'Occupied' },
-                            { value: 'maintenance', label: 'Maintenance' },
-                          ]}
-                          onChange={(e) => handleStatusChange(local, e.target.value)}
+                          value={statusOptions.find((option) => option.value === local.status)}
+                          options={statusOptions}
+                          onChange={(option) => {
+                            console.log('Selected option:', option);
+                            console.log('Current status:', local.status);
+                            const nextStatus = option?.value ?? local.status;
+                            console.log('Next status:', nextStatus);
+                            if (nextStatus !== local.status) {
+                              handleStatusChange(local, nextStatus);
+                            }
+                          }}
+                          isClearable={false}
                         />
                       </td>
                       <td className="p-3 flex justify-center gap-2">
@@ -276,22 +376,25 @@ const LocalPage = () => {
             />
             <Select
               label="Status"
-              value={editData.status}
-              options={[
-                { value: 'available', label: 'Available' },
-                { value: 'occupied', label: 'Occupied' },
-                { value: 'maintenance', label: 'Maintenance' },
-              ]}
-              onChange={(e) => setEditData({ ...editData, status: e.target.value })}
+              value={statusOptions.find((option) => option.value === editData.status)}
+              options={statusOptions}
+              onChange={(option) => setEditData({ ...editData, status: option?.value || 'available' })}
+              isClearable={false}
             />
             <Select
               label="Property"
-              value={editData.property_id}
-              options={properties.map(p => ({ value: p.id, label: p.name }))}
-              onChange={(e) => setEditData({ ...editData, property_id: e.target.value })}
+              value={propertyOptions.find((option) => option.value === editData.property_id) ?? null}
+              options={propertyOptions}
+              onChange={(option) =>
+                setEditData({ ...editData, property_id: option?.value || '' })
+              }
+              isClearable={false}
+              isDisabled={properties.length <= 1}
             />
           </div>
         </Modal>
+      )}
+        </>
       )}
     </div>
   );

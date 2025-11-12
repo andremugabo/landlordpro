@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 // ---------------------
 const allowedOrigins = [
   'http://localhost',
-//   'http://localhost:5173',
+  'http://localhost:5173',
   'http://localhost:80',
 //   'http://localhost:3000', 
   'http://frontend', 

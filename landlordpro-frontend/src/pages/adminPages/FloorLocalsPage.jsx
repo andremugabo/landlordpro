@@ -5,9 +5,10 @@ import {
   extractFloorsData 
 } from '../../services/floorService';
 import { Button, Modal, Input, Card, Badge } from '../../components';
-import { FiArrowLeft, FiHome, FiLayers, FiEdit, FiTrash, FiPlus, FiSearch } from 'react-icons/fi';
+import { FiArrowLeft, FiHome, FiLayers, FiEdit, FiTrash, FiPlus, FiSearch, FiTrendingUp, FiCheckCircle } from 'react-icons/fi';
 import { showSuccess, showError, showInfo } from '../../utils/toastHelper';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { createLocal, updateLocal, deleteLocal } from '../../services/localService';
 
 const FloorLocalsPage = () => {
   const { floorId } = useParams();
@@ -28,22 +29,23 @@ const FloorLocalsPage = () => {
     status: 'available' 
   });
 
-  // Get property info from URL params (passed from PropertyFloorsPage)
   const propertyId = searchParams.get('propertyId');
-  const propertyName = searchParams.get('propertyName');
+  const propertyNameParam = searchParams.get('propertyName');
   const floorNameFromUrl = searchParams.get('floorName');
 
   const fetchFloorData = async () => {
     try {
       setLoading(true);
       
-      // Fetch floor details
       const floorResponse = await getFloorById(floorId);
       const floorData = floorResponse.data;
       setFloor(floorData);
-      setLocals(floorData.locals || []);
+      const rawLocals = floorData.locals || floorData.locals_details || [];
+      const filteredLocals = Array.isArray(rawLocals)
+        ? rawLocals.filter((local) => String(local?.floor_id) === String(floorId))
+        : [];
+      setLocals(filteredLocals);
 
-      // Fetch occupancy report
       const occupancyResponse = await getFloorOccupancy(floorId);
       setOccupancy(occupancyResponse.data);
 
@@ -61,9 +63,12 @@ const FloorLocalsPage = () => {
     }
   }, [floorId]);
 
+  const resolvedPropertyId = propertyId || floor?.property_id || floor?.propertyForFloor?.id;
+  const resolvedPropertyName = propertyNameParam || floor?.propertyForFloor?.name || floor?.property_name;
+
   const handleBackToFloors = () => {
-    if (propertyId && propertyName) {
-      navigate(`/admin/properties/${propertyId}/floors`);
+    if (resolvedPropertyId) {
+      navigate(`/admin/properties/${resolvedPropertyId}/floors`);
     } else {
       navigate('/admin/floors');
     }
@@ -81,30 +86,62 @@ const FloorLocalsPage = () => {
   };
 
   const handleSubmit = async () => {
-    // TODO: Implement local update logic
-    console.log('Update local:', selectedLocal?.id, editData);
-    showSuccess('Local update functionality to be implemented');
-    setModalOpen(false);
+    if (!editData.local_number?.trim()) {
+      showError('Local number is required.');
+      return;
+    }
+
+    try {
+      if (selectedLocal) {
+        await updateLocal(selectedLocal.id, {
+          ...selectedLocal,
+          local_number: editData.local_number.trim(),
+          area: editData.area,
+          rent_price: editData.rent_price,
+          status: editData.status,
+        });
+        showSuccess('Local updated successfully.');
+      } else {
+        await createLocal({
+          floor_id: floorId,
+          local_number: editData.local_number.trim(),
+          area: editData.area,
+          rent_price: editData.rent_price,
+          status: editData.status,
+        });
+        showSuccess('Local created successfully.');
+      }
+      setModalOpen(false);
+      setSelectedLocal(null);
+      setEditData({ local_number: '', area: '', rent_price: '', status: 'available' });
+      fetchFloorData();
+    } catch (err) {
+      console.error(err);
+      showError(err?.message || 'Failed to save local');
+    }
   };
 
   const handleDeleteLocal = async (local) => {
     if (!window.confirm(`Are you sure you want to delete local "${local.local_number}"?`)) return;
-    // TODO: Implement local delete logic
-    console.log('Delete local:', local.id);
-    showInfo('Local delete functionality to be implemented');
+    try {
+      await deleteLocal(local.id);
+      showInfo('Local deleted successfully.');
+      fetchFloorData();
+    } catch (err) {
+      console.error(err);
+      showError(err?.message || 'Failed to delete local');
+    }
   };
 
   const handleAddLocal = () => {
-    // TODO: Implement add local logic
-    showInfo('Add local functionality to be implemented');
+    setSelectedLocal(null);
+    setEditData({ local_number: '', area: '', rent_price: '', status: 'available' });
+    setModalOpen(true);
   };
 
-  // Filter locals based on search term
   const filteredLocals = useMemo(() => {
     if (!Array.isArray(locals)) return [];
-    
     if (!searchTerm.trim()) return locals;
-    
     const searchLower = searchTerm.toLowerCase();
     return locals.filter(local =>
       local.local_number?.toLowerCase().includes(searchLower) ||
@@ -112,7 +149,6 @@ const FloorLocalsPage = () => {
     );
   }, [locals, searchTerm]);
 
-  // Calculate local statistics
   const localStats = useMemo(() => {
     const total = locals.length;
     const occupied = locals.filter(l => l.status === 'occupied').length;
@@ -125,10 +161,10 @@ const FloorLocalsPage = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'occupied': return 'bg-green-100 text-green-800';
-      case 'available': return 'bg-blue-100 text-blue-800';
-      case 'maintenance': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'occupied': return 'bg-emerald-100 text-emerald-700';
+      case 'available': return 'bg-blue-100 text-blue-700';
+      case 'maintenance': return 'bg-amber-100 text-amber-700';
+      default: return 'bg-slate-100 text-slate-700';
     }
   };
 
@@ -168,153 +204,157 @@ const FloorLocalsPage = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen pt-12 px-3 sm:px-6 bg-gray-50">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 mb-6">
-        <div className="flex items-center gap-4 mb-4">
-          <Button
-            className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-md flex items-center gap-2"
-            onClick={handleBackToFloors}
-          >
-            <FiArrowLeft className="text-base" />
-            Back to Floors
-          </Button>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-              <FiHome className="text-blue-500" />
-              <span>{propertyName || floor.property_name}</span>
-              <FiLayers className="text-blue-500 ml-2" />
-              <span>Floor {floor.level_number}</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center gap-2">
-              {floorNameFromUrl || floor.name} - Locals
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Manage and view all locals on this floor
-            </p>
-          </div>
-        </div>
+  const heroTitle = floorNameFromUrl || floor.name;
+  const heroSubtitle = resolvedPropertyName || floor.property_name;
 
-        {/* Stats Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-            <div className="text-2xl font-bold text-blue-600">{localStats.total}</div>
-            <div className="text-sm text-blue-700">Total Locals</div>
+  return (
+    <div className="min-h-screen pt-12 pb-12 px-3 sm:px-6 bg-slate-50">
+      <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 text-white rounded-2xl shadow-xl p-6 md:p-8 mb-8">
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-4 max-w-2xl">
+            <Button
+              className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 w-fit backdrop-blur"
+              onClick={handleBackToFloors}
+            >
+              <FiArrowLeft /> Back to Floors
+            </Button>
+            <div>
+              <p className="text-xs uppercase tracking-widest text-white/70">Floor Overview</p>
+              <h1 className="text-3xl md:text-4xl font-semibold mt-2 flex items-center gap-3">
+                <FiLayers className="text-white/70" />
+                {heroTitle}
+              </h1>
+              <p className="text-white/80 text-sm mt-2 flex items-center gap-2">
+                <FiHome className="text-white/60" />
+                {heroSubtitle}
+              </p>
+              <p className="text-white/60 text-xs mt-1">Level {floor.level_number}</p>
+            </div>
           </div>
-          <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-            <div className="text-2xl font-bold text-green-600">{localStats.occupied}</div>
-            <div className="text-sm text-green-700">Occupied</div>
-          </div>
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-            <div className="text-2xl font-bold text-blue-600">{localStats.available}</div>
-            <div className="text-sm text-blue-700">Available</div>
-          </div>
-          <div className="bg-red-50 p-4 rounded-lg border border-red-100">
-            <div className="text-2xl font-bold text-red-600">{localStats.maintenance}</div>
-            <div className="text-sm text-red-700">Maintenance</div>
-          </div>
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-            <div className="text-2xl font-bold text-purple-600">{localStats.occupancyRate}%</div>
-            <div className="text-sm text-purple-700">Occupancy Rate</div>
+          <div className="grid grid-cols-2 gap-4 min-w-[220px] md:min-w-[260px]">
+            <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-3 border border-white/20">
+              <div className="flex items-center justify-between text-sm text-white/70">
+                <span>Total locals</span>
+                <FiTrendingUp />
+              </div>
+              <p className="text-2xl font-semibold">{localStats.total}</p>
+              <p className="text-xs text-white/60 mt-1">Units registered</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-3 border border-white/20">
+              <div className="flex items-center justify-between text-sm text-white/70">
+                <span>Occupied</span>
+                <FiCheckCircle />
+              </div>
+              <p className="text-2xl font-semibold">{localStats.occupied}</p>
+              <p className="text-xs text-white/60 mt-1">{localStats.occupancyRate}% occupancy</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-3 border border-white/20">
+              <div className="flex items-center justify-between text-sm text-white/70">
+                <span>Available</span>
+                <FiTrendingUp />
+              </div>
+              <p className="text-2xl font-semibold">{localStats.available}</p>
+              <p className="text-xs text-white/60 mt-1">Ready for lease</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-3 border border-white/20">
+              <div className="flex items-center justify-between text-sm text-white/70">
+                <span>Maintenance</span>
+                <FiTrendingUp />
+              </div>
+              <p className="text-2xl font-semibold">{localStats.maintenance}</p>
+              <p className="text-xs text-white/60 mt-1">Needs attention</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Action Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div className="relative w-full sm:w-64">
-          <FiSearch className="absolute left-3 top-3 text-gray-400" />
-          <Input
-            placeholder="Search locals by number or status..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 w-full border-gray-300 rounded-lg"
-          />
-        </div>
-        
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <Card className="w-full md:max-w-md p-4 border border-slate-200 shadow-sm">
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-3 text-slate-400" />
+            <Input
+              placeholder="Search locals by number or status..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-white"
+            />
+          </div>
+        </Card>
         <Button
-          className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md flex items-center gap-2 w-full sm:w-auto justify-center"
+          className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 w-full md:w-auto justify-center"
           onClick={handleAddLocal}
         >
-          <FiPlus className="text-base" />
-          Add Local
+          <FiPlus className="text-base" /> Add Local
         </Button>
       </div>
 
-      {/* Locals Grid */}
-      <div className="grid gap-6">
+      <div className="space-y-6">
         {filteredLocals.length === 0 ? (
-          <Card className="bg-white rounded-lg shadow-sm border border-gray-100 p-8 text-center">
-            <FiLayers className="text-4xl text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-800 mb-2">
+          <Card className="bg-white rounded-2xl shadow-sm border border-slate-200 p-10 text-center">
+            <FiLayers className="text-5xl text-slate-300 mx-auto mb-5" />
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">
               {locals.length === 0 ? 'No Locals Found' : 'No Locals Match Your Search'}
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-slate-500 max-w-md mx-auto">
               {locals.length === 0 
-                ? 'This floor doesn\'t have any locals yet. Add locals to start managing this floor.'
-                : 'Try adjusting your search terms to find the local you\'re looking for.'
+                ? 'Use the “Add Local” button to create the first unit on this floor.'
+                : 'Try adjusting your search terms to locate a specific local.'
               }
             </p>
             {locals.length === 0 && (
               <Button
-                className="bg-green-500 hover:bg-green-600 text-white"
+                className="mt-4 bg-emerald-500 hover:bg-emerald-600 text-white"
                 onClick={handleAddLocal}
               >
-                <FiPlus className="mr-2" />
-                Add First Local
+                <FiPlus className="mr-2" /> Create Local
               </Button>
             )}
           </Card>
         ) : (
-          <>
-            {/* Desktop Table */}
-            <div className="hidden md:block bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-              <table className="min-w-full text-sm text-gray-700">
-                <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 text-xs uppercase">
+          <Card className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm text-slate-700">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wide">
                   <tr>
-                    <th className="p-4 font-semibold text-left">Local Number</th>
-                    <th className="p-4 font-semibold text-left">Status</th>
-                    <th className="p-4 font-semibold text-left">Area (m²)</th>
-                    <th className="p-4 font-semibold text-left">Rent Price</th>
-                    <th className="p-4 font-semibold text-left">Last Updated</th>
-                    <th className="p-4 font-semibold text-center">Actions</th>
+                    <th className="p-4 text-left">Local</th>
+                    <th className="p-4 text-left">Status</th>
+                    <th className="p-4 text-left">Area (m²)</th>
+                    <th className="p-4 text-left">Rent (FRW)</th>
+                    <th className="p-4 text-left">Last Updated</th>
+                    <th className="p-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLocals.map(local => (
-                    <tr key={local.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
-                      <td className="p-4 font-medium text-gray-800">
-                        <div className="flex items-center gap-2">
-                          <FiLayers className="text-blue-500" />
-                          {local.local_number || `LOC-${local.id.substring(0, 8)}`}
-                        </div>
+                  {filteredLocals.map((local) => (
+                    <tr key={local.id} className="border-b border-slate-200/80 last:border-none hover:bg-slate-50 transition-colors">
+                      <td className="p-4 font-medium text-slate-900 flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-slate-100 text-slate-600">
+                          <FiLayers />
+                        </span>
+                        {local.local_number || `LOC-${local.id.substring(0, 8)}`}
                       </td>
                       <td className="p-4">
-                        <Badge 
-                          className={getStatusColor(local.status)}
-                          text={getStatusText(local.status)}
-                        />
+                        <Badge className={getStatusColor(local.status)} text={getStatusText(local.status)} />
                       </td>
-                      <td className="p-4">
-                        {local.area ? `${local.area} m²` : '-'}
-                      </td>
-                      <td className="p-4">
-                        {local.rent_price ? `$${local.rent_price}` : '-'}
-                      </td>
-                      <td className="p-4 text-gray-500">
-                        {local.updatedAt ? new Date(local.updatedAt).toLocaleDateString() : '-'}
+                      <td className="p-4">{local.area ? `${local.area} m²` : '-'}</td>
+                      <td className="p-4">{local.rent_price ? Number(local.rent_price).toLocaleString() : '-'}</td>
+                      <td className="p-4 text-slate-500 text-xs">
+                        {local.updatedAt
+                          ? new Date(local.updatedAt).toLocaleDateString()
+                          : local.updated_at
+                          ? new Date(local.updated_at).toLocaleDateString()
+                          : '-'}
                       </td>
                       <td className="p-4">
                         <div className="flex justify-center gap-2">
                           <Button
-                            className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1"
+                            className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs flex items-center gap-1"
                             onClick={() => handleEditLocal(local)}
                           >
                             <FiEdit className="text-sm" /> Edit
                           </Button>
                           <Button
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1"
+                            className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs flex items-center gap-1"
                             onClick={() => handleDeleteLocal(local)}
                           >
                             <FiTrash className="text-sm" /> Delete
@@ -326,66 +366,13 @@ const FloorLocalsPage = () => {
                 </tbody>
               </table>
             </div>
-
-            {/* Mobile Cards */}
-            <div className="md:hidden grid gap-4">
-              {filteredLocals.map(local => (
-                <Card key={local.id} className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-2">
-                      <FiLayers className="text-blue-500" />
-                      <span className="font-medium text-gray-800">
-                        {local.local_number || `LOC-${local.id.substring(0, 8)}`}
-                      </span>
-                    </div>
-                    <Badge 
-                      className={getStatusColor(local.status)}
-                      text={getStatusText(local.status)}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                    <div>
-                      <div className="text-gray-500">Area</div>
-                      <div className="font-medium">{local.area ? `${local.area} m²` : '-'}</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500">Rent Price</div>
-                      <div className="font-medium">{local.rent_price ? `$${local.rent_price}` : '-'}</div>
-                    </div>
-                    <div className="col-span-2">
-                      <div className="text-gray-500">Last Updated</div>
-                      <div className="font-medium text-gray-600">
-                        {local.updatedAt ? new Date(local.updatedAt).toLocaleDateString() : '-'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-xs flex-1 flex items-center justify-center gap-1"
-                      onClick={() => handleEditLocal(local)}
-                    >
-                      <FiEdit className="text-sm" /> Edit
-                    </Button>
-                    <Button
-                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-xs flex items-center gap-1"
-                      onClick={() => handleDeleteLocal(local)}
-                    >
-                      <FiTrash className="text-sm" /> Delete
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </>
+          </Card>
         )}
       </div>
 
-      {/* Edit Local Modal */}
       {modalOpen && (
         <Modal
-          title={`Edit Local - ${selectedLocal?.local_number}`}
+          title={selectedLocal ? `Edit Local - ${selectedLocal.local_number}` : 'Create Local'}
           onClose={() => {
             setModalOpen(false);
             setSelectedLocal(null);
@@ -400,8 +387,7 @@ const FloorLocalsPage = () => {
               onChange={(e) => setEditData({ ...editData, local_number: e.target.value })}
               placeholder="Enter local number (e.g., A-101)"
             />
-            
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Area (m²)"
                 type="number"
@@ -410,14 +396,13 @@ const FloorLocalsPage = () => {
                 placeholder="Enter area"
               />
               <Input
-                label="Rent Price ($)"
+                label="Rent Price (FRW)"
                 type="number"
                 value={editData.rent_price}
                 onChange={(e) => setEditData({ ...editData, rent_price: e.target.value })}
                 placeholder="Enter rent price"
               />
             </div>
-
             <div>
               <label className="block text-gray-700 text-sm font-medium mb-1">
                 Status

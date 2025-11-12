@@ -14,7 +14,7 @@ const createPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Start date cannot be after end date' });
     }
 
-    const payment = await paymentService.createPayment(body, file);
+    const payment = await paymentService.createPayment(body, file, req.user);
 
     res.status(201).json({
       success: true,
@@ -54,7 +54,7 @@ const updatePayment = async (req, res) => {
 const getAllPayments = async (req, res) => {
   try {
     const { term } = req.query;
-    const payments = await paymentService.getAllPayments(term);
+    const payments = await paymentService.getAllPayments(term, req.user);
     res.json({ success: true, data: payments });
   } catch (err) {
     console.error('Error fetching payments:', err);
@@ -65,7 +65,10 @@ const getAllPayments = async (req, res) => {
 // -------------------- GET PAYMENT BY ID --------------------
 const getPaymentById = async (req, res) => {
   try {
-    const payment = await paymentService.getPaymentById(req.params.id);
+    const payment = await paymentService.getPaymentById(req.params.id, req.user);
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment not found' });
+    }
     res.json({ success: true, data: payment });
   } catch (err) {
     console.error('Error fetching payment by ID:', err);

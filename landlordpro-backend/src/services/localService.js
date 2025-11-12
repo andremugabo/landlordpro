@@ -5,7 +5,7 @@ const Floor = require('../models/Floor');
 /**
  * Get all locals with optional pagination and filtering by property and floor
  */
-async function getAllLocals({ page = 1, limit = 10, propertyId = null, floorId = null } = {}) {
+async function getAllLocals({ page = 1, limit = 10, propertyId = null, floorId = null, user = null } = {}) {
   const offset = (page - 1) * limit;
 
   const where = {};
@@ -17,8 +17,18 @@ async function getAllLocals({ page = 1, limit = 10, propertyId = null, floorId =
     limit,
     offset,
     include: [
-      { model: Property, as: 'property' },
-      { model: Floor, as: 'floor' }
+      {
+        model: Property,
+        as: 'property',
+        attributes: ['id', 'name', 'location', 'manager_id'],
+        required: user?.role === 'manager',
+        where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
+      },
+      {
+        model: Floor,
+        as: 'floor',
+        attributes: ['id', 'name', 'level_number', 'property_id'],
+      },
     ],
     order: [['created_at', 'DESC']],
   });

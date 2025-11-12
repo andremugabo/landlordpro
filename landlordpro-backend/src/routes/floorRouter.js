@@ -50,7 +50,7 @@ router.get(
 router.get(
   '/floors/:id/occupancy',
   managerOrAdminOnly,
-  verifyManagerAccess({ model: require('../models').Floor }),
+  verifyManagerAccess({ model: require('../models').Floor, propertyAlias: 'propertyForFloor' }),
   floorController.getFloorOccupancy
 );
 
@@ -66,7 +66,7 @@ router.get(
 router.get(
   '/floors/:id',
   managerOrAdminOnly,
-  verifyManagerAccess({ model: require('../models').Floor }),
+  verifyManagerAccess({ model: require('../models').Floor, propertyAlias: 'propertyForFloor' }),
   floorController.getFloorById
 );
 

@@ -32,6 +32,7 @@ export const router = createBrowserRouter([
       { path: '/admin/expenses', element: <Pages.ExpensePage/>},
       { path: '/admin/documents', element: <Pages.Documents/>},
       { path: '/admin/reports', element: <Pages.Reports/>},
+      { path: '/admin/settings', element: <Pages.AdminSettingsPage />},
     ]
   },
   {
@@ -39,7 +40,16 @@ export const router = createBrowserRouter([
     element: <Layouts.ManagerLayout />,
     children: [
       { index: true, element: <Pages.ManagerDashboard /> },
-      { path: '/manager/properties', element: <Pages.PropertyPage /> },
+      { path: '/manager/properties', element: <Pages.ManagerPropertyPage /> },
+      { path: '/manager/leases', element: <Pages.ManagerLeasePage/>},
+      { path: '/manager/locals', element: <Pages.ManagerLocalPage /> },
+      { path: '/manager/floors', element: <Pages.ManagerFloorPage /> },
+      { path: '/manager/tenants', element: <Pages.ManagerTenantPage/>},
+      { path: '/manager/payments', element: <Pages.ManagerPaymentPage/>},
+      { path: '/manager/expenses', element: <Pages.ManagerExpensePage/>},
+      { path: '/manager/reports', element: <Pages.ManagerReportsPage/>},
+      { path: '/manager/properties/:propertyId/floors', element: <Pages.ManagerPropertyFloorsPage /> },
+      { path: '/manager/floors/:floorId/locals', element: <Pages.ManagerFloorLocalsPage /> },
     ]
   }
 ]);

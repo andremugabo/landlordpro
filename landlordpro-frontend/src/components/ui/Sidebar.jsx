@@ -7,7 +7,7 @@ const ICONS = {
   Dashboard: Home,
   Users: Users,
   Properties: Building,
-  Floor: StoreIcon,
+  Floors: StoreIcon,
   Locals: BrickWall,
   Tenants: Users,
   Leases: FileText,

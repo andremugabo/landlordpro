@@ -5,11 +5,13 @@ import { getAllLocals } from '../../services/localService';
 import { Button, Input, Modal, Card, Select } from '../../components';
 import { FiEdit, FiPlus, FiTrash, FiSearch, FiDownload } from 'react-icons/fi';
 import { showSuccess, showError, showInfo } from '../../utils/toastHelper';
+import useAccessibleProperties from '../../hooks/useAccessibleProperties';
 
 const LeasePage = () => {
   const [leases, setLeases] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [locals, setLocals] = useState([]);
+  const [selectedPropertyId, setSelectedPropertyId] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedLease, setSelectedLease] = useState(null);
   const [editData, setEditData] = useState({
@@ -26,13 +28,34 @@ const LeasePage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const PAGE_SIZE = 10;
 
+  const {
+    isManager,
+    properties,
+    propertyOptions,
+    loading: loadingProperties,
+  } = useAccessibleProperties();
+
+  useEffect(() => {
+    if (!isManager) return;
+
+    if (properties.length === 1) {
+      setSelectedPropertyId(properties[0].id);
+    } else if (!properties.find((property) => property.id === selectedPropertyId)) {
+      setSelectedPropertyId('');
+    }
+  }, [isManager, properties, selectedPropertyId]);
+
   // Fetch tenants and locals
-  const fetchTenantsAndLocals = async () => {
+  const fetchTenantsAndLocals = async (propertyId) => {
     try {
       const tenantsData = await getAllTenants(1, 100);
-      const localsData = await getAllLocals(1, 100);
+      const localsParams = { page: 1, limit: 500 };
+      if (propertyId) {
+        localsParams.propertyId = propertyId;
+      }
+      const localsData = await getAllLocals(localsParams);
       setTenants(tenantsData.tenants || []);
-      setLocals(localsData.locals || []);
+      setLocals(localsData.locals || localsData.data || []);
     } catch {
       showError('Failed to fetch tenants or locals');
     }
@@ -55,25 +78,87 @@ const LeasePage = () => {
   };
 
   useEffect(() => {
-    fetchTenantsAndLocals();
-  }, []);
+    if (isManager && properties.length > 0 && !selectedPropertyId) {
+      return;
+    }
+
+    fetchTenantsAndLocals(selectedPropertyId || undefined);
+  }, [selectedPropertyId, isManager, properties.length]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedPropertyId]);
 
   useEffect(() => {
     fetchLeases(page, searchTerm);
   }, [page, searchTerm]);
 
-  const tenantsOptions = tenants.map(t => ({ value: t.id, label: t.name }));
-  const localsOptions = locals.map(l => ({ value: l.id, label: l.reference_code }));
+  const tenantsOptions = tenants.map((tenant) => ({ value: tenant.id, label: tenant.name }));
+  const localsOptions = locals.map((local) => ({
+    value: local.id,
+    label: local.reference_code || local.referenceCode || 'Unnamed Local'
+  }));
 
-  const filteredLeases = useMemo(
-    () =>
-      leases.filter(
-        l =>
-          l.tenant?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          l.local?.reference_code?.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [leases, searchTerm]
+  const localPropertyMap = useMemo(() => {
+    const map = new Map();
+    locals.forEach((local) => {
+      if (!local?.id) return;
+      const propertyId =
+        local.property_id ||
+        local.propertyId ||
+        local.property?.id ||
+        local.property?.property_id ||
+        null;
+      if (propertyId) {
+        map.set(local.id, propertyId);
+      }
+    });
+    return map;
+  }, [locals]);
+
+  const accessiblePropertyIds = useMemo(
+    () => new Set(properties.map((property) => property.id)),
+    [properties]
   );
+
+  const searchTermLower = searchTerm.toLowerCase();
+
+  const filteredLeases = useMemo(() => {
+    return leases.filter((lease) => {
+      const tenantName = lease.tenant?.name?.toLowerCase() || '';
+      const localCode =
+        lease.local?.referenceCode?.toLowerCase() ||
+        lease.local?.reference_code?.toLowerCase() ||
+        '';
+
+      const matchesSearch =
+        !searchTermLower || tenantName.includes(searchTermLower) || localCode.includes(searchTermLower);
+      if (!matchesSearch) return false;
+
+      const localId = lease.local?.id;
+      const leasePropertyId = localPropertyMap.get(localId);
+
+      if (isManager) {
+        if (!leasePropertyId || !accessiblePropertyIds.has(leasePropertyId)) {
+          return false;
+        }
+        if (selectedPropertyId && leasePropertyId !== selectedPropertyId) {
+          return false;
+        }
+      } else if (selectedPropertyId && leasePropertyId !== selectedPropertyId) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [
+    leases,
+    searchTermLower,
+    localPropertyMap,
+    isManager,
+    accessiblePropertyIds,
+    selectedPropertyId
+  ]);
 
   const handleEditClick = lease => {
     setSelectedLease(lease);
@@ -153,6 +238,17 @@ const LeasePage = () => {
           <h1 className="text-lg sm:text-xl font-semibold text-gray-800">Lease Management</h1>
           <p className="text-sm text-gray-500">Manage leases, tenants, and locals efficiently</p>
         </div>
+        <div className="w-full sm:w-72">
+          <Select
+            label="Filter by Property"
+            value={propertyOptions.find((option) => option.value === selectedPropertyId) ?? null}
+            options={propertyOptions}
+            isClearable={!isManager}
+            isDisabled={loadingProperties || (isManager && properties.length <= 1)}
+            placeholder={isManager ? 'Select your property...' : 'All properties'}
+            onChange={(option) => setSelectedPropertyId(option?.value || '')}
+          />
+        </div>
         <div className="flex flex-wrap gap-2 sm:gap-3">
           <Button
             onClick={() => {
@@ -161,6 +257,7 @@ const LeasePage = () => {
               setModalOpen(true);
             }}
             className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm"
+            disabled={isManager && properties.length === 0}
           >
             <FiPlus /> Add Lease
           </Button>
@@ -173,6 +270,12 @@ const LeasePage = () => {
         </div>
       </div>
 
+      {isManager && !loadingProperties && properties.length === 0 ? (
+        <Card className="p-6 text-center text-gray-600">
+          You are not assigned to any property yet. Please contact an administrator.
+        </Card>
+      ) : (
+        <>
       {/* Search */}
       <div className="relative w-full">
         <FiSearch className="absolute left-3 top-3 text-gray-400" />
@@ -314,7 +417,8 @@ const LeasePage = () => {
             </div>
           </Modal>
         )}
-
+        </>
+      )}
     </div>
   );
 };

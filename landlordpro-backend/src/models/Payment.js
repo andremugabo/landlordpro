@@ -40,6 +40,11 @@ const Payment = sequelize.define(
       allowNull: false,
       field: 'payment_mode_id',
     },
+    propertyId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'property_id',
+    },
     startDate: {
       type: DataTypes.DATE,
       allowNull: false,

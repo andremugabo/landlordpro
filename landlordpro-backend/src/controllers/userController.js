@@ -12,6 +12,13 @@ const {
   markNotificationRead: markNotificationReadService,
 } = require('../services/userService');
 
+const sanitizeUser = (userInstance) => {
+  if (!userInstance) return null;
+  const raw = userInstance.toJSON ? userInstance.toJSON() : userInstance;
+  const { password_hash, picture, ...rest } = raw;
+  return { ...rest, avatar: picture || null };
+};
+
 // --- Auth Controllers ---
 
 async function registerUser(req, res) {
@@ -90,7 +97,7 @@ async function updatePicture(req, res) {
     const picturePath = `/uploads/avatars/${req.file.filename}`;
     const user = await updatePictureService(userId, picturePath);
 
-    const { password_hash, ...userData } = user.toJSON();
+    const userData = sanitizeUser(user);
     res.status(200).json({ success: true, user: userData });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -203,8 +210,8 @@ async function getAllNotifications(req, res) {
 
 async function getProfile(req, res) {
   try {
-    const user = req.user;
-    const { password_hash, ...userData } = user.toJSON();
+    await req.user.reload();
+    const userData = sanitizeUser(req.user);
     res.status(200).json({ success: true, user: userData });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -216,8 +223,15 @@ async function updateProfile(req, res) {
     const user = req.user;
     const { full_name, email, phone, avatar } = req.body;
 
-    await user.update({ full_name, email, phone, avatar });
-    const { password_hash, ...userData } = user.toJSON();
+    const updates = {};
+    if (full_name !== undefined) updates.full_name = full_name;
+    if (email !== undefined) updates.email = email;
+    if (phone !== undefined) updates.phone = phone;
+    if (avatar !== undefined) updates.picture = avatar;
+
+    await user.update(updates);
+    await user.reload();
+    const userData = sanitizeUser(user);
 
     res.status(200).json({ success: true, user: userData });
   } catch (error) {

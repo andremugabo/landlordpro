@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar, Topbar } from '../components';
-import { logout, getLoggedInUser, getToken } from '../services/AuthService';
+import { logout, getLoggedInUser, getToken, saveLoggedInUser } from '../services/AuthService';
+import { getProfile } from '../services/userService';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -9,11 +10,13 @@ import 'react-toastify/dist/ReactToastify.css';
 const managerLinks = [
   { label: 'Dashboard', path: '/manager' },
   { label: 'Properties', path: '/manager/properties' },
+  { label: 'Floors', path: '/manager/floors' },
   { label: 'Locals', path: '/manager/locals' },
   { label: 'Tenants', path: '/manager/tenants' },
   { label: 'Leases', path: '/manager/leases' },
   { label: 'Payments', path: '/manager/payments' },
   { label: 'Expenses', path: '/manager/expenses' },
+  { label: 'Reports', path: '/manager/reports' },
 ];
 
 // Decode JWT and get expiration time
@@ -44,6 +47,21 @@ const ManagerLayout = () => {
     }
 
     setUser(currentUser);
+
+    const refreshProfile = async () => {
+      try {
+        const profile = await getProfile();
+        const latestUser = profile?.user || profile;
+        if (latestUser) {
+          saveLoggedInUser(latestUser);
+          setUser(latestUser);
+        }
+      } catch (error) {
+        console.error('Failed to refresh profile', error);
+      }
+    };
+
+    refreshProfile();
 
     const expiry = getTokenExpiry(token);
     const now = Math.floor(Date.now() / 1000);

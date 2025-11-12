@@ -34,6 +34,9 @@ async function authenticate(req, res, next) {
     }
 
     // ✅ Attach user to request
+    if (user.role) {
+      user.role = String(user.role).toLowerCase();
+    }
     req.user = user;
     next();
 
@@ -47,7 +50,8 @@ async function authenticate(req, res, next) {
  * Middleware: Restrict route to admin users
  */
 function adminOnly(req, res, next) {
-  if (req.user?.role !== 'admin') {
+  const role = req.user?.role ? String(req.user.role).toLowerCase() : '';
+  if (role !== 'admin') {
     return res.status(403).json({ success: false, message: 'Access denied: Admins only' });
   }
   next();
@@ -57,7 +61,8 @@ function adminOnly(req, res, next) {
  * Middleware: Restrict route to admin or manager users
  */
 function managerOrAdminOnly(req, res, next) {
-  if (req.user?.role === 'admin' || req.user?.role === 'manager') {
+  const role = req.user?.role ? String(req.user.role).toLowerCase() : '';
+  if (role === 'admin' || role === 'manager') {
     return next();
   }
   return res.status(403).json({ success: false, message: 'Access denied: Managers or admins only' });

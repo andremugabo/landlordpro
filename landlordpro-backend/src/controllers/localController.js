@@ -1,4 +1,5 @@
 const localService = require('../services/localService');
+const Property = require('../models/Property');
 
 /**
  * Get all locals (optional filtering by property or floor)
@@ -10,7 +11,7 @@ async function getAllLocals(req, res) {
     const propertyId = req.query.propertyId || null;
     const floorId = req.query.floorId || null;
 
-    const data = await localService.getAllLocals({ page, limit, propertyId, floorId });
+    const data = await localService.getAllLocals({ page, limit, propertyId, floorId, user: req.user });
     res.status(200).json({ success: true, ...data });
   } catch (err) {
     console.error(err);
@@ -24,7 +25,18 @@ async function getAllLocals(req, res) {
 async function getLocalsByPropertyId(req, res) {
   try {
     const { id: propertyId } = req.params;
-    const data = await localService.getAllLocals({ page: 1, limit: 1000, propertyId });
+
+    if (req.user.role === 'manager') {
+      const property = await Property.findByPk(propertyId, { attributes: ['id', 'manager_id'] });
+      if (!property) {
+        return res.status(404).json({ success: false, message: 'Property not found' });
+      }
+      if (property.manager_id !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Access denied: You are not assigned to this property.' });
+      }
+    }
+
+    const data = await localService.getAllLocals({ page: 1, limit: 1000, propertyId, user: req.user });
     res.status(200).json({ success: true, locals: data.locals });
   } catch (err) {
     console.error(err);

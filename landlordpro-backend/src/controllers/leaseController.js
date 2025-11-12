@@ -22,7 +22,7 @@ async function createLease(req, res) {
       localId,
       tenantId,
       status,
-    });
+    }, req.user);
 
     res.status(201).json({
       success: true,
@@ -44,7 +44,7 @@ async function getAllLeases(req, res) {
     const limit = parseInt(req.query.limit) || 10;
     const { status } = req.query;
 
-    const result = await leaseService.getAllLeases({ page, limit, status });
+    const result = await leaseService.getAllLeases({ page, limit, status }, req.user);
     res.status(200).json({ success: true, ...result });
   } catch (err) {
     console.error('Error fetching leases:', err);
@@ -57,7 +57,7 @@ async function getAllLeases(req, res) {
  */
 async function getLease(req, res) {
   try {
-    const lease = await leaseService.getLeaseById(req.params.id);
+    const lease = await leaseService.getLeaseById(req.params.id, req.user);
     res.status(200).json({ success: true, lease });
   } catch (err) {
     console.error('Error fetching lease:', err);
@@ -70,7 +70,7 @@ async function getLease(req, res) {
  */
 async function updateLease(req, res) {
   try {
-    const lease = await leaseService.updateLease(req.params.id, req.body);
+    const lease = await leaseService.updateLease(req.params.id, req.body, req.user);
     res.status(200).json({ success: true, message: 'Lease updated successfully', lease });
   } catch (err) {
     console.error('Error updating lease:', err);
