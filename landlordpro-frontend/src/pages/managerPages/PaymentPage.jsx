@@ -241,26 +241,42 @@ const ManagerPaymentPage = () => {
     <div className="space-y-6 pt-12 px-3 sm:px-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Payments Overview</h1>
-          <p className="text-sm text-gray-500">Track payments tied to your managed leases.</p>
+          <h1 className="text-2xl font-semibold text-white">Payments Overview</h1>
+          <p className="text-sm text-white">Track payments tied to your managed leases.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <Select
-            label="Filter by Property"
-            value={propertyOptions.find((option) => option.value === selectedPropertyId) ?? null}
-            options={[{ value: '', label: 'All Properties' }, ...propertyOptions]}
-            isSearchable
-            onChange={(option) => setSelectedPropertyId(option?.value || '')}
-            className="sm:w-64"
-          />
-          <Button
-            onClick={handleOpenCreateModal}
-            disabled={!leases.length}
-            className="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 justify-center"
-          >
-            <FiPlus className="text-base" /> Record Payment
-          </Button>
-        </div>
+        <div className="flex flex-col sm:flex-row sm:items-end gap-4 w-full">
+  {/* Property Filter */}
+  <div className="flex-1 min-w-[220px]">
+    <Select
+      label="Filter by Property"
+      value={propertyOptions.find(option => option.value === selectedPropertyId) ?? null}
+      options={[{ value: '', label: 'All Properties' }, ...propertyOptions]}
+      isSearchable
+      onChange={(option) => setSelectedPropertyId(option?.value || '')}
+      classNamePrefix="react-select"
+      styles={{
+        control: (provided) => ({
+          ...provided,
+          borderRadius: '0.5rem',
+          borderColor: '#cbd5e1', // Tailwind gray-300
+          minHeight: '2.75rem',
+        }),
+      }}
+    />
+  </div>
+
+  {/* Record Payment Button */}
+  <Button
+    onClick={handleOpenCreateModal}
+    disabled={!leases.length}
+    className={`w-full sm:w-auto flex items-center gap-2 justify-center px-5 py-2 rounded-lg text-white shadow-md transition-colors duration-200
+      ${leases.length ? 'bg-teal-500 hover:bg-teal-600' : 'bg-gray-300 cursor-not-allowed'}`}
+  >
+    <FiPlus className="text-lg" />
+    Record Payment
+  </Button>
+</div>
+
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

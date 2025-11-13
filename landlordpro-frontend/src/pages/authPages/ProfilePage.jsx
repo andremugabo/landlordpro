@@ -234,12 +234,15 @@ const ProfilePage = () => {
         <div className="text-center">
           <FiAlertCircle className="mx-auto text-red-500 text-4xl mb-4" />
           <p className="text-gray-500 mb-4">Failed to load profile</p>
-          <Button
-            onClick={handleBack}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <FiArrowLeft /> Go Back
-          </Button>
+          <div className="relative z-10">
+            <Button
+              onClick={handleBack}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <FiArrowLeft /> Go Back
+            </Button>
+          </div>
+
         </div>
       </div>
     );
@@ -254,13 +257,15 @@ const ProfilePage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-12 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex items-start gap-4">
-              <Button
-                onClick={handleBack}
-                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg border border-white/30 shadow-sm transition"
-              >
-                <FiArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Back</span>
-              </Button>
+            <div className="relative z-10">
+                <Button
+                  onClick={handleBack}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <FiArrowLeft /> Go Back
+                </Button>
+              </div>
+
               <div>
                 <p className="text-xs uppercase tracking-[0.35em] text-white/70">Account Centre</p>
                 <h1 className="text-3xl sm:text-4xl font-semibold mt-2">My Profile</h1>

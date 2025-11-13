@@ -67,41 +67,49 @@ const AdminSettingsPage = () => {
 
   const handleSaveProfile = async () => {
     if (savingProfile || uploadingAvatar) return;
-
+  
+    // Validation
     if (!profileForm.full_name.trim()) {
       showError('Full name is required');
       return;
     }
-
+  
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailPattern.test(profileForm.email)) {
       showError('Please enter a valid email address');
       return;
     }
-
+  
     try {
-      // Upload avatar first if user selected a new one
+      // 1️⃣ Upload avatar first if user selected one
       if (selectedAvatarFile) {
         setUploadingAvatar(true);
         await uploadAvatar(selectedAvatarFile);
         setUploadingAvatar(false);
       }
-
-      // Then update profile info (name, email, phone)
+  
+      // 2️⃣ Update profile info (send only backend-expected fields)
+      const profileData = {
+        name: profileForm.full_name.trim(),
+        email: profileForm.email.trim(),
+        phone: profileForm.phone?.trim() || '',
+      };
+  
       setSavingProfile(true);
-      await updateProfile(profileForm);
-      
+      await updateProfile(profileData);
+  
       showSuccess('Profile updated successfully');
-      
-      // Reload profile to get fresh data including new avatar URL
+  
+      // 3️⃣ Reload profile to refresh data
       await loadProfile();
-      
-      // Clear avatar selection
-      setSelectedAvatarFile(null);
+  
+      // 4️⃣ Clear avatar selection
+      if (selectedAvatarFile) setSelectedAvatarFile(null);
       if (avatarPreviewUrl) {
         URL.revokeObjectURL(avatarPreviewUrl);
         setAvatarPreviewUrl(null);
       }
+  
     } catch (error) {
       console.error(error);
       showError(error?.message || 'Failed to update profile');
@@ -110,6 +118,7 @@ const AdminSettingsPage = () => {
       setUploadingAvatar(false);
     }
   };
+  
 
   const handlePasswordChange = async () => {
     if (changingPassword) return;

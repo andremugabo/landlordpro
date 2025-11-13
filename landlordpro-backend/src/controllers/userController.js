@@ -238,27 +238,25 @@ async function getProfile(req, res) {
 
 async function updateProfile(req, res) {
   try {
-    const userInstance = await User.findByPk(req.user.id);
-    if (!userInstance) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
+    const user = req.user; 
     const { full_name, email, phone, avatar } = req.body;
+
     const updates = {};
     if (full_name !== undefined) updates.full_name = full_name;
     if (email !== undefined) updates.email = email;
     if (phone !== undefined) updates.phone = phone;
     if (avatar !== undefined) updates.picture = avatar;
 
-    await userInstance.update(updates);
-    const userData = sanitizeUser(userInstance);
+    await user.update(updates);
+    await user.reload(); // ensures the instance has latest data
+    const userData = sanitizeUser(user);
 
     res.status(200).json({ success: true, user: userData });
   } catch (error) {
-    console.error('updateProfile error:', error);
     res.status(400).json({ success: false, message: error.message });
   }
 }
+
 
 module.exports = {
   registerUser,

@@ -252,8 +252,8 @@ const ManagerReportsPage = () => {
     <div className="space-y-6 pt-12 px-3 sm:px-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-800">Portfolio Reports</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-2xl font-semibold text-white">Portfolio Reports</h1>
+          <p className="text-sm text-white">
             Financial and occupancy insights for your assigned properties
           </p>
         </div>

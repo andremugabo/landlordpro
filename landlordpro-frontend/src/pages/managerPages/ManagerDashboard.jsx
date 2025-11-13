@@ -195,7 +195,7 @@ const ManagerDashboard = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mt-16">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Manager Dashboard</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">

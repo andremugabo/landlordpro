@@ -139,29 +139,44 @@ const ManagerExpensePage = () => {
     <div className="space-y-6 pt-12 px-3 sm:px-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-800">Expense Overview</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-2xl font-semibold text-white">Expense Overview</h1>
+          <p className="text-sm text-white">
             Monitor expenses for the properties assigned to you
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <Select
-            label="Filter by Property"
-            value={propertyOptions.find((option) => option.value === selectedPropertyId) ?? null}
-            options={[{ value: '', label: 'All Properties' }, ...propertyOptions]}
-            onChange={(option) => setSelectedPropertyId(option?.value || '')}
-            isSearchable
-          />
-          <Button
-            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md border"
-            onClick={() => {
-              setSelectedPropertyId('');
-              setSearchTerm('');
-            }}
-          >
-            Clear Filters
-          </Button>
-        </div>
+        <div className="flex flex-col sm:flex-row sm:items-end gap-4 w-full">
+  {/* Property Filter */}
+  <div className="flex-1 min-w-[200px]">
+    <Select
+      label="Filter by Property"
+      value={propertyOptions.find(option => option.value === selectedPropertyId) ?? null}
+      options={[{ value: '', label: 'All Properties' }, ...propertyOptions]}
+      onChange={(option) => setSelectedPropertyId(option?.value || '')}
+      isSearchable
+      classNamePrefix="react-select"
+      styles={{
+        control: (provided) => ({
+          ...provided,
+          borderRadius: '0.5rem',
+          borderColor: '#d1d5db', // Tailwind gray-300
+          minHeight: '2.75rem',
+        }),
+      }}
+    />
+  </div>
+
+  {/* Clear Filters Button */}
+  <Button
+    className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-md shadow-md transition-colors duration-200"
+    onClick={() => {
+      setSelectedPropertyId('');
+      setSearchTerm('');
+    }}
+  >
+    Clear Filters
+  </Button>
+</div>
+
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

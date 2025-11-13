@@ -1,47 +1,58 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Sun, Moon, Bell, LogOut, Settings, User, Menu } from 'lucide-react';
 import { toast } from 'react-toastify';
-import {
-  getUnreadNotifications,
-  markNotificationRead,
-} from '../../services/userService';
+import { getUnreadNotifications, markNotificationRead } from '../../services/userService';
 import { useNavigate } from 'react-router-dom';
 import defaultAvatar from '../../assets/react.svg';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
-const resolveAvatarUrl = (avatar) => {
-  if (!avatar) return defaultAvatar;
-  if (avatar.startsWith('http')) return avatar;
-  if (avatar.startsWith('/uploads')) {
-    const trimmedBase = API_BASE_URL.replace(/\/$/, '');
-    return `${trimmedBase}${avatar}`;
+/** Resolve avatar URL with fallback */
+const resolveAvatarUrl = (user) => {
+  const displayName = user?.full_name || user?.name || user?.email?.split('@')[0] || 'User';
+
+  if (!user?.avatar) {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=14B8A6&color=fff&rounded=true`;
   }
-  return avatar;
+
+  if (user.avatar.startsWith('http')) return user.avatar;
+  if (user.avatar.startsWith('/uploads')) {
+    const trimmedBase = API_BASE_URL.replace(/\/$/, '');
+    return `${trimmedBase}${user.avatar}`;
+  }
+
+  return defaultAvatar;
+};
+
+/** Reusable Avatar component */
+const Avatar = ({ user, size = 36 }) => {
+  const displayName = user?.full_name || user?.name || user?.email?.split('@')[0] || 'User';
+  const url = resolveAvatarUrl(user);
+
+  return (
+    <img
+      src={url}
+      alt={`${displayName} avatar`}
+      className={`w-${size} h-${size} rounded-full border border-gray-200 dark:border-gray-700 object-cover`}
+      onError={(e) => {
+        e.currentTarget.onerror = null;
+        e.currentTarget.src = defaultAvatar;
+      }}
+    />
+  );
 };
 
 const Topbar = ({ user, onLogout, onMenuClick }) => {
-  const [darkMode, setDarkMode] = useState(
-    () => localStorage.getItem('theme') === 'dark'
-  );
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const menuRef = useRef(null);
-
   const navigate = useNavigate();
 
-  const displayName = useMemo(() => {
-    return user?.full_name || user?.name || user?.email?.split('@')[0] || 'User';
-  }, [user]);
+  const displayName = useMemo(() => user?.full_name || user?.name || user?.email?.split('@')[0] || 'User', [user]);
 
-  const avatarUrl = useMemo(() => {
-    return user?.avatar ? resolveAvatarUrl(user.avatar) : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=14B8A6&color=fff&rounded=true`;
-  }, [user, displayName]);
-
-  const goToProfile = () => {
-    navigate('/profile');
-  };
+  const goToProfile = () => navigate('/profile');
 
   // Persist theme preference
   useEffect(() => {
@@ -62,12 +73,8 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
         setNotificationsOpen(false);
       }
     };
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        setMenuOpen(false);
-        setNotificationsOpen(false);
-      }
-    };
+    const handleEsc = (e) => { if (e.key === 'Escape') { setMenuOpen(false); setNotificationsOpen(false); } };
+
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEsc);
     return () => {
@@ -89,8 +96,6 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
 
   useEffect(() => {
     fetchNotifications();
-
-    // Auto-refresh every 30 seconds
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -99,10 +104,7 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
 
   const handleMarkAllRead = async () => {
     try {
-      // Optimistically update locally
       setNotifications((prev) => prev.map((notif) => ({ ...notif, is_read: true })));
-
-      // Persist to backend
       await Promise.all(notifications.map((notif) => markNotificationRead(notif.id)));
       toast.success('All notifications marked as read');
     } catch (err) {
@@ -113,9 +115,7 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
 
   const handleMarkRead = async (id) => {
     try {
-      setNotifications((prev) =>
-        prev.map((notif) => (notif.id === id ? { ...notif, is_read: true } : notif))
-      );
+      setNotifications((prev) => prev.map((notif) => (notif.id === id ? { ...notif, is_read: true } : notif)));
       await markNotificationRead(id);
     } catch (err) {
       console.error(err);
@@ -155,13 +155,10 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
             )}
           </button>
 
-          {/* Notifications Dropdown */}
           {notificationsOpen && (
             <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden animate-dropdown z-50">
               <div className="flex justify-between items-center px-4 py-2 border-b border-gray-100 dark:border-gray-700">
-                <span className="font-medium text-gray-800 dark:text-gray-200">
-                  Notifications
-                </span>
+                <span className="font-medium text-gray-800 dark:text-gray-200">Notifications</span>
                 <button
                   onClick={handleMarkAllRead}
                   className="text-xs text-teal-600 hover:text-teal-500 dark:text-teal-400 dark:hover:text-teal-300"
@@ -171,9 +168,7 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
               </div>
               <div className="max-h-64 overflow-y-auto">
                 {notifications.length === 0 ? (
-                  <p className="p-4 text-sm text-gray-500 dark:text-gray-400">
-                    No new notifications
-                  </p>
+                  <p className="p-4 text-sm text-gray-500 dark:text-gray-400">No new notifications</p>
                 ) : (
                   notifications.map((notif) => (
                     <div
@@ -198,11 +193,7 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
           onClick={() => setDarkMode(!darkMode)}
           className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
         >
-          {darkMode ? (
-            <Sun className="w-5 h-5 text-yellow-400" />
-          ) : (
-            <Moon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-          )}
+          {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-600 dark:text-gray-300" />}
         </button>
 
         {/* User dropdown */}
@@ -213,16 +204,8 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
             aria-haspopup="true"
             aria-expanded={menuOpen}
           >
-            <img
-              src={avatarUrl}
-              alt={`${displayName} avatar`}
-              className="w-9 h-9 rounded-full border border-gray-200 dark:border-gray-700 object-cover"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src = defaultAvatar;
-              }}
-            />
-            <span className="hidden sm:inline-block text-gray-800 dark:text-gray-200">
+            <Avatar user={user} size={9} />
+            <span className="hidden sm:inline-block text-gray-800 dark:text-gray-200 truncate max-w-[120px]">
               {displayName}
             </span>
           </button>
@@ -230,15 +213,11 @@ const Topbar = ({ user, onLogout, onMenuClick }) => {
           {menuOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden animate-dropdown">
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                  {displayName}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {user.email || 'Admin User'}
-                </p>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{displayName}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{user.email || 'Admin User'}</p>
               </div>
 
-              <button  onClick={goToProfile} className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+              <button onClick={goToProfile} className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                 <User className="w-4 h-4" /> Profile
               </button>
               <button className="flex items-center gap-2 w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
