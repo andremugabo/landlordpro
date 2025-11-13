@@ -23,7 +23,8 @@ const AdminSettingsPage = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -35,7 +36,6 @@ const AdminSettingsPage = () => {
         email: user?.email || '',
         phone: user?.phone || '',
       });
-      setAvatarPreview(null);
     } catch (error) {
       console.error(error);
       showError(error?.message || 'Failed to load profile');
@@ -46,18 +46,27 @@ const AdminSettingsPage = () => {
     loadProfile();
   }, [loadProfile]);
 
-  const avatarUrl = useMemo(() => {
-    if (avatarPreview) return avatarPreview;
+  // Cleanup preview URL when component unmounts or avatar changes
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+    };
+  }, [avatarPreviewUrl]);
+
+  const displayedAvatar = useMemo(() => {
+    if (avatarPreviewUrl) return avatarPreviewUrl;
     if (profile?.avatar) return profile.avatar;
     return defaultAvatar;
-  }, [profile, avatarPreview]);
+  }, [profile, avatarPreviewUrl]);
 
   const handleProfileChange = (field, value) => {
     setProfileForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSaveProfile = async () => {
-    if (savingProfile) return;
+    if (savingProfile || uploadingAvatar) return;
 
     if (!profileForm.full_name.trim()) {
       showError('Full name is required');
@@ -71,17 +80,28 @@ const AdminSettingsPage = () => {
     }
 
     try {
-      setSavingProfile(true);
-      const payload = { ...profileForm };
-      if (avatarPreview && avatarPreview instanceof File) {
+      // Upload avatar first if user selected a new one
+      if (selectedAvatarFile) {
         setUploadingAvatar(true);
-        const uploadResult = await uploadAvatar(avatarPreview);
-        payload.avatar = uploadResult?.avatar;
+        await uploadAvatar(selectedAvatarFile);
+        setUploadingAvatar(false);
       }
-      const updated = await updateProfile(payload);
-      setProfile(updated?.user || updated);
+
+      // Then update profile info (name, email, phone)
+      setSavingProfile(true);
+      await updateProfile(profileForm);
+      
       showSuccess('Profile updated successfully');
-      setAvatarPreview(null);
+      
+      // Reload profile to get fresh data including new avatar URL
+      await loadProfile();
+      
+      // Clear avatar selection
+      setSelectedAvatarFile(null);
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+        setAvatarPreviewUrl(null);
+      }
     } catch (error) {
       console.error(error);
       showError(error?.message || 'Failed to update profile');
@@ -138,7 +158,14 @@ const AdminSettingsPage = () => {
       return;
     }
 
-    setAvatarPreview(file);
+    // Clean up old preview URL
+    if (avatarPreviewUrl) {
+      URL.revokeObjectURL(avatarPreviewUrl);
+    }
+
+    // Store file and create preview URL
+    setSelectedAvatarFile(file);
+    setAvatarPreviewUrl(URL.createObjectURL(file));
   };
 
   if (!profile) {
@@ -163,7 +190,7 @@ const AdminSettingsPage = () => {
           <div className="text-center space-y-4">
             <div className="relative inline-block">
               <img
-                src={avatarPreview instanceof File ? URL.createObjectURL(avatarPreview) : avatarUrl}
+                src={displayedAvatar}
                 alt="Avatar"
                 className="w-28 h-28 rounded-full object-cover border-4 border-white shadow-md"
                 onError={(event) => {
@@ -224,9 +251,9 @@ const AdminSettingsPage = () => {
             <Button
               onClick={handleSaveProfile}
               disabled={savingProfile || uploadingAvatar}
-              className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+              className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
             >
-              {savingProfile || uploadingAvatar ? 'Saving...' : 'Save profile'}
+              {uploadingAvatar ? 'Uploading avatar...' : savingProfile ? 'Saving...' : 'Save profile'}
             </Button>
           </div>
 
@@ -267,7 +294,7 @@ const AdminSettingsPage = () => {
             <Button
               onClick={handlePasswordChange}
               disabled={changingPassword}
-              className="mt-4 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg"
+              className="mt-4 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
             >
               {changingPassword ? 'Updating...' : 'Update password'}
             </Button>

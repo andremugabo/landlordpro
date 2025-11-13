@@ -11,6 +11,7 @@ const {
   getUnreadNotifications: getUnreadNotificationsService,
   markNotificationRead: markNotificationReadService,
 } = require('../services/userService');
+const { User } = require('../models');
 
 const sanitizeUser = (userInstance) => {
   if (!userInstance) return null;
@@ -210,31 +211,51 @@ async function getAllNotifications(req, res) {
 
 async function getProfile(req, res) {
   try {
-    await req.user.reload();
-    const userData = sanitizeUser(req.user);
+    const user = await User.findByPk(req.user.id, {
+      attributes: [
+        'id',
+        'email',
+        'full_name',
+        'role',
+        'picture',
+        'phone',
+        'is_active',
+        'created_at',
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const userData = sanitizeUser(user);
     res.status(200).json({ success: true, user: userData });
   } catch (error) {
+    console.error('getProfile error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 }
 
 async function updateProfile(req, res) {
   try {
-    const user = req.user;
-    const { full_name, email, phone, avatar } = req.body;
+    const userInstance = await User.findByPk(req.user.id);
+    if (!userInstance) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
+    const { full_name, email, phone, avatar } = req.body;
     const updates = {};
     if (full_name !== undefined) updates.full_name = full_name;
     if (email !== undefined) updates.email = email;
     if (phone !== undefined) updates.phone = phone;
     if (avatar !== undefined) updates.picture = avatar;
 
-    await user.update(updates);
-    await user.reload();
-    const userData = sanitizeUser(user);
+    await userInstance.update(updates);
+    const userData = sanitizeUser(userInstance);
 
     res.status(200).json({ success: true, user: userData });
   } catch (error) {
+    console.error('updateProfile error:', error);
     res.status(400).json({ success: false, message: error.message });
   }
 }

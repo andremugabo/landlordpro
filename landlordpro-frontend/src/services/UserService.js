@@ -97,7 +97,7 @@ export const registerUser = (userObj) =>
 export const getProfile = () => handleRequest(api.get('/profile'));
 
 /**
- * Update profile details
+ * Update profile details (name, email, phone)
  */
 export const updateProfile = (data) =>
   handleRequest(api.put('/profile', data));
@@ -110,16 +110,12 @@ export const updatePassword = (payload) =>
 
 /**
  * Upload avatar/profile picture
+ * FIXED: No Content-Type header - let axios set it with boundary
  */
 export const uploadAvatar = (file) => {
   const formData = new FormData();
   formData.append('avatar', file);
-  return handleRequest(
-    api.put('/profile/picture', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-    'Failed to upload avatar'
-  );
+  return handleRequest(api.put('/profile/picture', formData));
 };
 
 /* ================================
@@ -141,20 +137,13 @@ export const markNotificationRead = (id) =>
 /* ================================
    🔑 AUTH (Login/Register)
 ================================ */
-export const loginUser = async (email, password) => {
-  try {
-    const response = await api.post('/auth/login', { email, password });
-    return response.data; // token + user
-  } catch (err) {
-    throw new Error(err.response?.data?.message || 'Login failed');
-  }
-};
+export const loginUser = (email, password) =>
+  handleRequest(api.post('/auth/login', { email, password }));
 
 /**
  * Get all active managers (for assigning to properties)
  */
 export const getAllManagers = async () => {
-  const { users } = await getAllUsers(1, 1000); // fetch all users (adjust limit if needed)
-  // Filter by role 'manager' and active users only
+  const { users } = await getAllUsers(1, 1000);
   return users.filter(user => user.role === 'manager' && user.is_active);
 };
