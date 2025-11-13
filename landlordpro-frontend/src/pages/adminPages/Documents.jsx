@@ -1023,7 +1023,7 @@ const Documents = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100">
+        <Card className="p-4 bg-linear-to-br from-blue-50 to-blue-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Documents</p>
@@ -1033,7 +1033,7 @@ const Documents = () => {
           </div>
         </Card>
 
-        <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100">
+        <Card className="p-4 bg-linear-to-br from-green-50 to-green-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">With Proof</p>
@@ -1043,7 +1043,7 @@ const Documents = () => {
           </div>
         </Card>
 
-        <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100">
+        <Card className="p-4 bg-linear-to-br from-purple-50 to-purple-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Amount</p>

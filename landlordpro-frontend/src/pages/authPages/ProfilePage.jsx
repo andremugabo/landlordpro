@@ -253,7 +253,7 @@ const ProfilePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="relative isolate overflow-hidden bg-gradient-to-br from-slate-900 via-sky-900 to-indigo-900 text-white">
+      <div className="relative isolate overflow-hidden bg-linear-to-br from-slate-900 via-sky-900 to-indigo-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-12 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex items-start gap-4">
@@ -288,7 +288,7 @@ const ProfilePage = () => {
             </div>
           </div>
         </div>
-        <div className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.4)_0,_transparent_55%)]" aria-hidden="true" />
+        <div className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.4)_0,transparent_55%)]" aria-hidden="true" />
       </div>
 
       <div className="relative z-10 -mt-10 pb-12">
@@ -375,7 +375,7 @@ const ProfilePage = () => {
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-3">
                     <div 
-                      className="bg-gradient-to-r from-sky-500 to-indigo-500 h-3 rounded-full transition-all duration-500"
+                      className="bg-linear-to-r from-sky-500 to-indigo-500 h-3 rounded-full transition-all duration-500"
                       style={{ width: `${completionPercentage}%` }}
                     ></div>
                   </div>
@@ -510,8 +510,8 @@ const ProfilePage = () => {
                   Recent Activity Log
                 </h3>
                 <div className="space-y-3">
-                  <div className="flex items-start gap-4 p-4 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-100">
-                    <div className="p-2.5 bg-sky-500 text-white rounded-full flex-shrink-0">
+                  <div className="flex items-start gap-4 p-4 bg-linear-to-br from-slate-50 to-white rounded-xl border border-slate-100">
+                    <div className="p-2.5 bg-sky-500 text-white rounded-full shrink-0">
                       <FiSettings className="w-4 h-4" />
                     </div>
                     <div>
@@ -522,8 +522,8 @@ const ProfilePage = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-4 p-4 bg-gradient-to-br from-emerald-50 to-white rounded-xl border border-emerald-100">
-                    <div className="p-2.5 bg-emerald-500 text-white rounded-full flex-shrink-0">
+                  <div className="flex items-start gap-4 p-4 bg-linear-to-br from-emerald-50 to-white rounded-xl border border-emerald-100">
+                    <div className="p-2.5 bg-emerald-500 text-white rounded-full shrink-0">
                       <FiCheckCircle className="w-4 h-4" />
                     </div>
                     <div>
@@ -534,8 +534,8 @@ const ProfilePage = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-4 p-4 bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-100">
-                    <div className="p-2.5 bg-indigo-500 text-white rounded-full flex-shrink-0">
+                  <div className="flex items-start gap-4 p-4 bg-linear-to-br from-indigo-50 to-white rounded-xl border border-indigo-100">
+                    <div className="p-2.5 bg-indigo-500 text-white rounded-full shrink-0">
                       <FiShield className="w-4 h-4" />
                     </div>
                     <div>
@@ -704,7 +704,7 @@ const ProfilePage = () => {
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <FiShield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <FiShield className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-blue-900 mb-2">Password Requirements:</p>
                   <ul className="text-xs text-blue-800 space-y-1.5">

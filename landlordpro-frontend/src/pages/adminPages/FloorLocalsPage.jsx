@@ -209,7 +209,7 @@ const FloorLocalsPage = () => {
 
   return (
     <div className="min-h-screen pt-12 pb-12 px-3 sm:px-6 bg-slate-50">
-      <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 text-white rounded-2xl shadow-xl p-6 md:p-8 mb-8">
+      <div className="bg-linear-to-br from-indigo-900 via-purple-900 to-slate-900 text-white rounded-2xl shadow-xl p-6 md:p-8 mb-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div className="space-y-4 max-w-2xl">
             <Button
