@@ -12,7 +12,6 @@ const localController = require('../controllers/localController');
 // 🧱 Middleware
 // =======================
 const { authenticate, adminOnly, managerOrAdminOnly } = require('../middleware/authMiddleware');
-const verifyPropertyAccess = require('../middleware/verifyManagerAccess');
 
 // ======================================================
 // 🔐 All routes require authentication
@@ -20,74 +19,73 @@ const verifyPropertyAccess = require('../middleware/verifyManagerAccess');
 router.use(authenticate);
 
 // ======================================================
-// 🏠 PROPERTY ROUTES (all prefixed with /properties)
+// 🏠 PROPERTY ROUTES
 // ======================================================
+// ⚠️ IMPORTANT: This router is mounted at /api in app.js
+// Example: app.use('/api', propertyRoutes);
+// Therefore, all routes MUST include '/properties' prefix
+// Final URLs will be: /api/properties/...
 
 // ------------------------------------------------------
-// 🔸 Create a new property → Admin only
+// 🔸 Create a new property
+//     → Admin can assign to any manager
+//     → Manager creates property assigned to themselves
 // ------------------------------------------------------
-router.post('/properties', adminOnly, propertyController.createProperty);
+router.post('/properties', managerOrAdminOnly, propertyController.createProperty);
 
 // ------------------------------------------------------
-// 🔸 Get all properties
-//     → Admin sees all
-//     → Manager sees only assigned property
+// 🔸 Get all properties (with pagination)
+//     → Admin sees all properties
+//     → Manager sees only their assigned properties
 // ------------------------------------------------------
 router.get('/properties', managerOrAdminOnly, propertyController.getAllProperties);
 
 // ------------------------------------------------------
-// 🔸 Get a single property
-//     → Admin or assigned Manager only
+// 🔸 Get a single property by ID
+//     → Admin can access any property
+//     → Manager can only access their assigned property
+//     → Access control handled by service layer
 // ------------------------------------------------------
-router.get(
-  '/properties/:id',
-  managerOrAdminOnly,
-  verifyPropertyAccess,
-  propertyController.getPropertyById
-);
+router.get('/properties/:id', managerOrAdminOnly, propertyController.getPropertyById);
 
 // ------------------------------------------------------
 // 🔸 Update a property
-//     → Admin only
+//     → Admin can update any property (including manager_id)
+//     → Manager can update their assigned property (cannot change manager_id)
+//     → Access control handled by service layer
 // ------------------------------------------------------
-router.put('/properties/:id', adminOnly, propertyController.updateProperty);
+router.put('/properties/:id', managerOrAdminOnly, propertyController.updateProperty);
 
 // ------------------------------------------------------
 // 🔸 Soft-delete a property
-//     → Admin only
+//     → Admin can delete any property
+//     → Manager can delete their assigned property
+//     → Access control handled by service layer
 // ------------------------------------------------------
-router.delete('/properties/:id', adminOnly, propertyController.deleteProperty);
+router.delete('/properties/:id', managerOrAdminOnly, propertyController.deleteProperty);
 
 // ------------------------------------------------------
 // 🔸 Get all floors for a property
-//     → Admin or assigned Manager only
+//     → Admin can access floors for any property
+//     → Manager can only access floors for their assigned property
+//     → Access control handled by service layer
+// ✅ FIXED: Changed from adminOnly to managerOrAdminOnly
 // ------------------------------------------------------
-router.get(
-  '/properties/:id/floors',
-  managerOrAdminOnly,
-  verifyPropertyAccess,
-  propertyController.getFloorsByPropertyId
-);
+router.get('/properties/:id/floors', managerOrAdminOnly, propertyController.getFloorsByPropertyId);
 
 // ------------------------------------------------------
 // 🔸 Get all locals for a property
-//     → Admin or assigned Manager only
+//     → Admin can access locals for any property
+//     → Manager can only access locals for their assigned property
+//     → Access control handled by service layer
 // ------------------------------------------------------
-router.get(
-  '/properties/:id/locals',
-  managerOrAdminOnly,
-  verifyPropertyAccess,
-  localController.getLocalsByPropertyId
-);
+router.get('/properties/:id/locals', managerOrAdminOnly, localController.getLocalsByPropertyId);
 
 // ------------------------------------------------------
 // 🔸 Assign Manager to Property
-//     → Admin only
+//     → Admin only - can assign/reassign managers to properties
+//     → Managers cannot reassign properties
 // ------------------------------------------------------
-router.put(
-  '/properties/:propertyId/assign-manager',
-  adminOnly,
-  propertyController.assignManager
-);
+router.patch('/properties/:propertyId/assign-manager', adminOnly, propertyController.assignManager);
 
 module.exports = router;

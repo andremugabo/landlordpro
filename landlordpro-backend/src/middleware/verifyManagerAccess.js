@@ -23,13 +23,35 @@ module.exports = function verifyManagerAccess(options) {
       const user = req.user;
       const entityId = req[paramId][idField];
 
+      console.log('verifyManagerAccess:', { 
+        role: user.role, 
+        entityId, 
+        model: model.name 
+      });
+
       if (!entityId) {
-        return res.status(400).json({ message: 'Entity ID is required' });
+        return res.status(400).json({ 
+          success: false,
+          message: 'Entity ID is required' 
+        });
       }
 
-      // Admins bypass access checks
-      if (user.role === 'admin') return next();
+      // ✅ Admins bypass access checks
+      if (user.role === 'admin') {
+        console.log('Admin access granted, bypassing checks');
+        return next();
+      }
 
+      // ✅ Employees don't have access
+      if (user.role === 'employee') {
+        console.log('Employee access denied');
+        return res.status(403).json({ 
+          success: false,
+          message: 'Access restricted to managers or admins.' 
+        });
+      }
+
+      // ✅ Manager access validation
       if (user.role === 'manager') {
         const includeConfig = propertyAlias
           ? {
@@ -46,21 +68,38 @@ module.exports = function verifyManagerAccess(options) {
           attributes: ['id', propertyKey],
         });
 
+        console.log('Manager validation result:', { 
+          entityFound: !!entity,
+          entityId,
+          managerId: user.id 
+        });
+
         if (!entity) {
+          console.log('Manager access denied: entity not found or not assigned');
           return res.status(403).json({
+            success: false,
             message: 'Access denied: You are not assigned to this property.',
           });
         }
+
+        // ✅ CRITICAL FIX: Call next() when manager validation succeeds!
+        console.log('Manager access granted');
+        return next();
       }
 
-      if (user.role === 'employee') {
-        return res.status(403).json({ message: 'Access restricted to managers or admins.' });
-      }
+      // ✅ Unknown role - deny by default
+      console.log('Unknown role, access denied');
+      return res.status(403).json({ 
+        success: false,
+        message: 'Invalid user role.' 
+      });
 
-      next();
     } catch (err) {
       console.error('Manager access check failed:', err);
-      res.status(500).json({ message: 'Internal server error while verifying access.' });
+      res.status(500).json({ 
+        success: false,
+        message: 'Internal server error while verifying access.' 
+      });
     }
   };
 };

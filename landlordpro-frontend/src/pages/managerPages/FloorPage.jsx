@@ -35,16 +35,18 @@ const ManagerFloorPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const propertyIdFromUrl = searchParams.get('propertyId');
 
+  // ✅ Set initial property from URL
   useEffect(() => {
     if (propertyIdFromUrl) {
       setSelectedPropertyId(propertyIdFromUrl);
     }
   }, [propertyIdFromUrl]);
 
+  // ✅ Auto-select property for managers with single property
   useEffect(() => {
     if (!isManager) return;
 
-    if (properties.length === 1) {
+    if (properties.length === 1 && !selectedPropertyId) {
       setSelectedPropertyId(properties[0].id);
     } else if (!properties.find((property) => property.id === selectedPropertyId)) {
       setSelectedPropertyId('');
@@ -62,68 +64,110 @@ const ManagerFloorPage = () => {
     [propertyOptions, selectedPropertyId]
   );
 
-  const fetchFloors = useCallback(async () => {
-    const targetPropertyIds =
-      selectedPropertyId || !isManager
-        ? [selectedPropertyId || null].filter(Boolean)
-        : properties.map((property) => property.id);
-
-    if (isManager && targetPropertyIds.length === 0) {
-      setFloors([]);
-      setOccupancyReports({});
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const floorResponses = await Promise.all(
-        targetPropertyIds.map((propertyId) => getFloorsByPropertyId(propertyId))
-      );
-
-      const combinedFloors = dedupeById(
-        floorResponses.flatMap((response, index) => {
-          const data = extractFloorsData(response);
-          const propertyId = targetPropertyIds[index];
-          const propertyName = propertyNameMap.get(propertyId) || 'Unknown property';
-
-          return data.map((floor) => ({
-            ...floor,
-            property_id: propertyId,
-            property_name: floor.property_name || propertyName,
-          }));
-        })
-      );
-
-      const occupancyResponses = await Promise.all(
-        targetPropertyIds.map((propertyId) => getAllFloorsOccupancy({ propertyId }))
-      );
-
-      const occupancyMap = {};
-      occupancyResponses.forEach((response) => {
-        const reports = extractFloorsData(response);
-        reports.forEach((report) => {
-          occupancyMap[report.floor_id] = report;
-        });
-      });
-
-      setFloors(combinedFloors);
-      setOccupancyReports(occupancyMap);
-    } catch (err) {
-      console.error(err);
-      showError(err?.message || 'Failed to fetch floors');
-      setFloors([]);
-      setOccupancyReports({});
-    } finally {
-      setLoading(false);
-    }
-  }, [isManager, selectedPropertyId, properties, propertyNameMap]);
-
+  // ✅ CRITICAL FIX: Fetch logic inside useEffect to prevent infinite loops
   useEffect(() => {
-    fetchFloors();
-  }, [fetchFloors]);
+    let isCancelled = false;
 
+    const fetchFloors = async () => {
+      // Wait for properties to load first
+      if (loadingProperties) {
+        return;
+      }
+
+      const targetPropertyIds =
+        selectedPropertyId || !isManager
+          ? [selectedPropertyId || null].filter(Boolean)
+          : properties.map((property) => property.id);
+
+      // If manager has no properties, show empty state
+      if (isManager && targetPropertyIds.length === 0) {
+        setFloors([]);
+        setOccupancyReports({});
+        setLoading(false);
+        return;
+      }
+
+      // If no property selected and manager has multiple properties, don't fetch yet
+      if (isManager && !selectedPropertyId && properties.length > 1) {
+        setFloors([]);
+        setOccupancyReports({});
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        console.log('📋 Fetching floors for properties:', targetPropertyIds);
+
+        const floorResponses = await Promise.all(
+          targetPropertyIds.map((propertyId) => getFloorsByPropertyId(propertyId))
+        );
+
+        if (isCancelled) return;
+
+        const combinedFloors = dedupeById(
+          floorResponses.flatMap((response, index) => {
+            const data = extractFloorsData(response);
+            const propertyId = targetPropertyIds[index];
+            const propertyName = propertyNameMap.get(propertyId) || 'Unknown property';
+
+            return data.map((floor) => ({
+              ...floor,
+              property_id: propertyId,
+              property_name: floor.property_name || propertyName,
+            }));
+          })
+        );
+
+        console.log('✅ Combined floors:', combinedFloors.length);
+
+        const occupancyResponses = await Promise.all(
+          targetPropertyIds.map((propertyId) => getAllFloorsOccupancy({ propertyId }))
+        );
+
+        if (isCancelled) return;
+
+        const occupancyMap = {};
+        occupancyResponses.forEach((response) => {
+          const reports = extractFloorsData(response);
+          reports.forEach((report) => {
+            occupancyMap[report.floor_id] = report;
+          });
+        });
+
+        console.log('✅ Occupancy reports:', Object.keys(occupancyMap).length);
+
+        setFloors(combinedFloors);
+        setOccupancyReports(occupancyMap);
+      } catch (err) {
+        if (!isCancelled) {
+          console.error('❌ Error fetching floors:', err);
+          showError(err?.message || 'Failed to fetch floors');
+          setFloors([]);
+          setOccupancyReports({});
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchFloors();
+
+    // ✅ Cleanup to prevent state updates after unmount
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    isManager, 
+    selectedPropertyId, 
+    properties, 
+    propertyNameMap, 
+    loadingProperties
+  ]); // ✅ All dependencies listed
+
+  // ✅ Reset page when filters change
   useEffect(() => {
     setPage(1);
   }, [searchTerm, selectedPropertyId]);
@@ -134,9 +178,10 @@ const ManagerFloorPage = () => {
     let filtered = floors;
 
     if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
       filtered = filtered.filter((floor) =>
-        floor.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        floor?.property_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        floor.name?.toLowerCase().includes(term) ||
+        floor?.property_name?.toLowerCase().includes(term)
       );
     }
 
@@ -235,6 +280,10 @@ const ManagerFloorPage = () => {
       ) : loading ? (
         <div className="flex items-center justify-center py-16">
           <Spinner />
+        </div>
+      ) : isManager && !selectedPropertyId && properties.length > 1 ? (
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 text-center text-gray-600">
+          Please select a property to view its floors.
         </div>
       ) : floors.length === 0 ? (
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 text-center text-gray-600">

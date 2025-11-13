@@ -289,10 +289,7 @@ const LocalPage = () => {
                           value={statusOptions.find((option) => option.value === local.status)}
                           options={statusOptions}
                           onChange={(option) => {
-                            console.log('Selected option:', option);
-                            console.log('Current status:', local.status);
                             const nextStatus = option?.value ?? local.status;
-                            console.log('Next status:', nextStatus);
                             if (nextStatus !== local.status) {
                               handleStatusChange(local, nextStatus);
                             }

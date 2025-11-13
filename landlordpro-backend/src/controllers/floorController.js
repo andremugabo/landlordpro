@@ -25,11 +25,13 @@ exports.createFloor = handleAsync(async (req, res) => {
 
 // ================================
 // 📋 Get All Floors with Property Info (with optional property filter)
+// ✅ FIXED: Now passes req.user
 // ================================
 exports.getAllFloors = handleAsync(async (req, res) => {
   const { propertyId } = req.query;
+  const user = req.user;
   
-  const floors = await floorService.getAllFloors(propertyId || null);
+  const floors = await floorService.getAllFloors(propertyId || null, user);
 
   const formattedFloors = floors.map((floor) => ({
     id: floor.id,
@@ -60,27 +62,17 @@ exports.getAllFloors = handleAsync(async (req, res) => {
 
 // ================================
 // 🏢 Get Floors by Property ID
+// ✅ FIXED: Removed duplicate check, service handles it
 // ================================
 exports.getFloorsByPropertyId = handleAsync(async (req, res) => {
   const { propertyId } = req.params;
   const user = req.user;
 
-  const property = await Property.findByPk(propertyId, {
-    attributes: ['id', 'name', 'location', 'manager_id'],
-  });
+  // Service now handles access control, but we still need property info for response
+  const result = await floorService.getFloorsByPropertyId(propertyId, user);
 
-  if (!property) {
-    return res.status(404).json({ success: false, message: 'Property not found.' });
-  }
-
-  if (user?.role === 'manager' && property.manager_id !== user.id) {
-    return res.status(403).json({ success: false, message: 'Access denied: You are not assigned to this property.' });
-  }
-
-  const floors = await floorService.getFloorsByPropertyId(propertyId);
-
-  const formattedFloors = floors.map((floor) => {
-    const locals = floor.localsForFloor || [];
+  const formattedFloors = result.floors.map((floor) => {
+    const locals = floor.localsForFloor || floor.locals || [];
     const total = locals.length;
     const occupied = locals.filter(l => l.status === 'occupied').length;
     const available = locals.filter(l => l.status === 'available').length;
@@ -92,8 +84,8 @@ exports.getFloorsByPropertyId = handleAsync(async (req, res) => {
       name: floor.name,
       level_number: floor.level_number,
       property_id: floor.property_id,
-      property_name: floor.propertyForFloor?.name || property.name,
-      property_location: floor.propertyForFloor?.location || property.location,
+      property_name: floor.property_name,
+      property_location: result.property?.location,
       locals,
       locals_count: total,
       locals_details: locals.map(local => ({
@@ -116,22 +108,20 @@ exports.getFloorsByPropertyId = handleAsync(async (req, res) => {
   res.status(200).json({
     success: true,
     total: formattedFloors.length,
-    property: {
-      id: property.id,
-      name: property.name,
-      location: property.location,
-    },
+    property: result.property,
     data: formattedFloors,
   });
 });
 
 // ================================
 // 📊 Get Floors with Detailed Statistics (with optional property filter)
+// ✅ FIXED: Now passes req.user
 // ================================
 exports.getFloorsWithStats = handleAsync(async (req, res) => {
   const { propertyId } = req.query;
+  const user = req.user;
   
-  const floors = await floorService.getFloorsWithStats(propertyId || null);
+  const floors = await floorService.getFloorsWithStats(propertyId || null, user);
 
   // Format the response to include both floor data and statistics
   const formattedFloors = floors.map(floor => ({
@@ -167,9 +157,11 @@ exports.getFloorsWithStats = handleAsync(async (req, res) => {
 
 // ================================
 // 🔍 Get a Floor by ID
+// ✅ FIXED: Now passes req.user
 // ================================
 exports.getFloorById = handleAsync(async (req, res) => {
-  const floor = await floorService.getFloorById(req.params.id);
+  const user = req.user;
+  const floor = await floorService.getFloorById(req.params.id, user);
   
   // Format the response
   const formattedFloor = {
@@ -199,9 +191,11 @@ exports.getFloorById = handleAsync(async (req, res) => {
 
 // ================================
 // ✏️ Update Floor Info
+// ✅ FIXED: Now passes req.user
 // ================================
 exports.updateFloor = handleAsync(async (req, res) => {
-  const updated = await floorService.updateFloor(req.params.id, req.body);
+  const user = req.user;
+  const updated = await floorService.updateFloor(req.params.id, req.body, user);
   
   // Format the updated floor response
   const formattedFloor = {
@@ -221,9 +215,11 @@ exports.updateFloor = handleAsync(async (req, res) => {
 
 // ================================
 // 🗑️ Delete (Soft Delete) Floor
+// ✅ FIXED: Now passes req.user
 // ================================
 exports.deleteFloor = handleAsync(async (req, res) => {
-  const result = await floorService.deleteFloor(req.params.id);
+  const user = req.user;
+  const result = await floorService.deleteFloor(req.params.id, user);
   res.status(200).json({
     success: true,
     ...result,
@@ -235,8 +231,10 @@ exports.deleteFloor = handleAsync(async (req, res) => {
 // ================================
 
 // Single floor occupancy
+// ✅ FIXED: Now passes req.user
 exports.getFloorOccupancy = handleAsync(async (req, res) => {
-  const report = await floorService.getFloorOccupancy(req.params.id);
+  const user = req.user;
+  const report = await floorService.getFloorOccupancy(req.params.id, user);
   
   // Ensure consistent response structure
   const formattedReport = {
@@ -263,10 +261,12 @@ exports.getFloorOccupancy = handleAsync(async (req, res) => {
 });
 
 // All floors occupancy (with optional property filter)
+// ✅ Already correct - passes req.user
 exports.getAllFloorsOccupancy = handleAsync(async (req, res) => {
   const { propertyId } = req.query;
   const user = req.user;
 
+  // ✅ Optional: Keep this check for early validation with better error message
   if (propertyId && user?.role === 'manager') {
     const property = await Property.findByPk(propertyId, { attributes: ['id', 'manager_id'] });
     if (!property) {
@@ -308,11 +308,13 @@ exports.getAllFloorsOccupancy = handleAsync(async (req, res) => {
 
 // ================================
 // 🏠 Get Floors for a Specific Property (Simple list)
+// ✅ FIXED: Now passes req.user
 // ================================
 exports.getPropertyFloors = handleAsync(async (req, res) => {
   const { propertyId } = req.params;
+  const user = req.user;
   
-  const floors = await floorService.getAllFloors(propertyId);
+  const floors = await floorService.getAllFloors(propertyId, user);
 
   const simpleFloors = floors.map((floor) => {
     const locals = floor.localsForFloor || [];
@@ -347,11 +349,13 @@ exports.getPropertyFloors = handleAsync(async (req, res) => {
 
 // ================================
 // 🔄 Get Floor Summary for Dashboard
+// ✅ FIXED: Now passes req.user
 // ================================
 exports.getFloorsSummary = handleAsync(async (req, res) => {
   const { propertyId } = req.query;
+  const user = req.user;
   
-  const floors = await floorService.getAllFloors(propertyId || null);
+  const floors = await floorService.getAllFloors(propertyId || null, user);
   
   // Calculate summary statistics
   const summary = {

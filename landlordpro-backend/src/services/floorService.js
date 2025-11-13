@@ -3,8 +3,9 @@ const { Floor, Local, Property, Op } = require('../models');
 class FloorService {
   /**
    * Get all floors (with property + locals) - with optional property filter
+   * ✅ FIXED: Added user parameter for manager access control
    */
-  async getAllFloors(propertyId = null) {
+  async getAllFloors(propertyId = null, user = null) {
     const whereClause = {};
     
     if (propertyId) {
@@ -23,6 +24,9 @@ class FloorService {
           model: Property,
           as: 'propertyForFloor',
           attributes: ['id', 'name'],
+          // ✅ Filter by manager if user is a manager
+          required: user?.role === 'manager',
+          where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
         },
       ],
       order: [['level_number', 'ASC']],
@@ -31,9 +35,9 @@ class FloorService {
 
   /**
    * Get floors by property ID with safe column handling
-   * ✅ FIXED: No longer throws 404 for empty floors
+   * ✅ FIXED: Added user parameter and manager verification
    */
-  async getFloorsByPropertyId(propertyId) {
+  async getFloorsByPropertyId(propertyId, user = null) {
     try {
       // Validate propertyId
       if (!propertyId) {
@@ -42,10 +46,19 @@ class FloorService {
         throw error;
       }
 
-      // Optional: Verify property exists (recommended)
-      const property = await Property.findByPk(propertyId);
+      // Verify property exists and manager has access
+      const propertyWhere = { id: propertyId };
+      if (user?.role === 'manager') {
+        propertyWhere.manager_id = user.id;
+      }
+
+      const property = await Property.findOne({ where: propertyWhere });
       if (!property) {
-        const error = new Error('Property not found');
+        const error = new Error(
+          user?.role === 'manager' 
+            ? 'Property not found or you do not have access to it'
+            : 'Property not found'
+        );
         error.statusCode = 404;
         throw error;
       }
@@ -67,8 +80,6 @@ class FloorService {
         order: [['level_number', 'ASC']],
       });
 
-      // ✅ Return empty array if no floors - this is valid!
-      // Transform data to include helpful metadata
       return {
         floors: floors.map(floor => ({
           id: floor.id,
@@ -77,7 +88,7 @@ class FloorService {
           property_id: floor.property_id,
           property_name: floor.propertyForFloor?.name,
           localsForFloor: floor.localsForFloor || [],
-          locals: floor.localsForFloor || [], // Alias for frontend compatibility
+          locals: floor.localsForFloor || [],
           locals_count: floor.localsForFloor?.length || 0
         })),
         property: {
@@ -88,7 +99,7 @@ class FloorService {
       };
 
     } catch (error) {
-      // If columns don't exist, fall back to basic query
+      // Fallback logic remains the same
       if (error.message.includes('column') && error.message.includes('does not exist')) {
         console.warn('Local table missing some columns, using fallback query');
         
@@ -109,7 +120,6 @@ class FloorService {
           order: [['level_number', 'ASC']],
         });
 
-        // Add placeholder data for missing fields
         const floorsWithPlaceholders = floors.map(floor => {
           const localsWithPlaceholders = (floor.localsForFloor || []).map(local => ({
             ...local.toJSON(),
@@ -147,12 +157,22 @@ class FloorService {
 
   /**
    * Create a new floor
+   * ✅ FIXED: Added user parameter to verify manager access
    */
-  async createFloor(data) {
-    // Validate property exists
-    const property = await Property.findByPk(data.property_id);
+  async createFloor(data, user = null) {
+    // Verify property exists and manager has access
+    const propertyWhere = { id: data.property_id };
+    if (user?.role === 'manager') {
+      propertyWhere.manager_id = user.id;
+    }
+
+    const property = await Property.findOne({ where: propertyWhere });
     if (!property) {
-      const error = new Error('Property not found');
+      const error = new Error(
+        user?.role === 'manager'
+          ? 'Property not found or you do not have access to it'
+          : 'Property not found'
+      );
       error.statusCode = 404;
       throw error;
     }
@@ -176,33 +196,41 @@ class FloorService {
 
   /**
    * Get a floor by ID with safe column handling
+   * ✅ FIXED: Added user parameter to verify manager access
    */
-  async getFloorById(id) {
+  async getFloorById(id, user = null) {
     try {
-      const floor = await Floor.findByPk(id, {
-        include: [
-          {
-            model: Local,
-            as: 'localsForFloor',
-            attributes: ['id', 'status', 'local_number', 'area', 'rent_price'],
-          },
-          {
-            model: Property,
-            as: 'propertyForFloor',
-            attributes: ['id', 'name', 'location', 'number_of_floors'],
-          },
-        ],
-      });
+      const includeOptions = [
+        {
+          model: Local,
+          as: 'localsForFloor',
+          attributes: ['id', 'status', 'local_number', 'area', 'rent_price'],
+        },
+        {
+          model: Property,
+          as: 'propertyForFloor',
+          attributes: ['id', 'name', 'location', 'number_of_floors', 'manager_id'],
+          // ✅ Filter by manager if user is a manager
+          required: user?.role === 'manager',
+          where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
+        },
+      ];
+
+      const floor = await Floor.findByPk(id, { include: includeOptions });
 
       if (!floor) {
-        const error = new Error('Floor not found');
+        const error = new Error(
+          user?.role === 'manager'
+            ? 'Floor not found or you do not have access to it'
+            : 'Floor not found'
+        );
         error.statusCode = 404;
         throw error;
       }
 
       return floor;
     } catch (error) {
-      // If columns don't exist, fall back to basic query
+      // Fallback for missing columns
       if (error.message.includes('column') && error.message.includes('does not exist')) {
         console.warn('Local table missing some columns, using fallback query');
         
@@ -216,18 +244,23 @@ class FloorService {
             {
               model: Property,
               as: 'propertyForFloor',
-              attributes: ['id', 'name', 'location', 'number_of_floors'],
+              attributes: ['id', 'name', 'location', 'number_of_floors', 'manager_id'],
+              required: user?.role === 'manager',
+              where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
             },
           ],
         });
 
         if (!floor) {
-          const error = new Error('Floor not found');
+          const error = new Error(
+            user?.role === 'manager'
+              ? 'Floor not found or you do not have access to it'
+              : 'Floor not found'
+          );
           error.statusCode = 404;
           throw error;
         }
 
-        // Add placeholder data for missing fields
         const localsWithPlaceholders = (floor.localsForFloor || []).map(local => ({
           ...local.toJSON(),
           local_number: `LOC-${local.id.substring(0, 8)}`,
@@ -246,12 +279,28 @@ class FloorService {
 
   /**
    * Update floor details
+   * ✅ FIXED: Added user parameter to verify manager access
    */
-  async updateFloor(id, data) {
-    const floor = await Floor.findByPk(id);
+  async updateFloor(id, data, user = null) {
+    // First get the floor with property info
+    const floor = await Floor.findByPk(id, {
+      include: [{
+        model: Property,
+        as: 'propertyForFloor',
+        attributes: ['id', 'manager_id']
+      }]
+    });
+
     if (!floor) {
       const error = new Error('Floor not found');
       error.statusCode = 404;
+      throw error;
+    }
+
+    // Check manager access
+    if (user?.role === 'manager' && floor.propertyForFloor?.manager_id !== user.id) {
+      const error = new Error('You do not have access to this floor');
+      error.statusCode = 403;
       throw error;
     }
 
@@ -261,7 +310,7 @@ class FloorService {
         where: {
           property_id: floor.property_id,
           level_number: data.level_number,
-          id: { [Op.ne]: id } // Exclude current floor
+          id: { [Op.ne]: id }
         }
       });
 
@@ -278,12 +327,27 @@ class FloorService {
 
   /**
    * Soft delete floor
+   * ✅ FIXED: Added user parameter to verify manager access
    */
-  async deleteFloor(id) {
-    const floor = await Floor.findByPk(id);
+  async deleteFloor(id, user = null) {
+    const floor = await Floor.findByPk(id, {
+      include: [{
+        model: Property,
+        as: 'propertyForFloor',
+        attributes: ['id', 'manager_id']
+      }]
+    });
+
     if (!floor) {
       const error = new Error('Floor not found');
       error.statusCode = 404;
+      throw error;
+    }
+
+    // Check manager access
+    if (user?.role === 'manager' && floor.propertyForFloor?.manager_id !== user.id) {
+      const error = new Error('You do not have access to this floor');
+      error.statusCode = 403;
       throw error;
     }
 
@@ -301,8 +365,9 @@ class FloorService {
 
   /**
    * Get floors with detailed statistics with safe column handling
+   * ✅ FIXED: Added user parameter for manager access control
    */
-  async getFloorsWithStats(propertyId = null) {
+  async getFloorsWithStats(propertyId = null, user = null) {
     const whereClause = {};
     if (propertyId) {
       whereClause.property_id = propertyId;
@@ -320,7 +385,10 @@ class FloorService {
           {
             model: Property,
             as: 'propertyForFloor',
-            attributes: ['id', 'name', 'location'],
+            attributes: ['id', 'name', 'location', 'manager_id'],
+            // ✅ Filter by manager if user is a manager
+            required: user?.role === 'manager',
+            where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
           },
         ],
         order: [['level_number', 'ASC']],
@@ -355,7 +423,7 @@ class FloorService {
         };
       });
     } catch (error) {
-      // If columns don't exist, fall back to basic stats
+      // Fallback for missing columns
       if (error.message.includes('column') && error.message.includes('does not exist')) {
         console.warn('Local table missing some columns, using basic statistics');
         
@@ -370,7 +438,9 @@ class FloorService {
             {
               model: Property,
               as: 'propertyForFloor',
-              attributes: ['id', 'name', 'location'],
+              attributes: ['id', 'name', 'location', 'manager_id'],
+              required: user?.role === 'manager',
+              where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
             },
           ],
           order: [['level_number', 'ASC']],
@@ -405,19 +475,33 @@ class FloorService {
 
   /**
    * Occupancy report for one floor with safe column handling
+   * ✅ FIXED: Added user parameter to verify manager access
    */
-  async getFloorOccupancy(id) {
+  async getFloorOccupancy(id, user = null) {
     try {
       const floor = await Floor.findByPk(id, {
-        include: { 
-          model: Local, 
-          as: 'localsForFloor', 
-          attributes: ['id', 'status', 'local_number', 'area', 'rent_price'] 
-        },
+        include: [
+          { 
+            model: Local, 
+            as: 'localsForFloor', 
+            attributes: ['id', 'status', 'local_number', 'area', 'rent_price'] 
+          },
+          {
+            model: Property,
+            as: 'propertyForFloor',
+            attributes: ['id', 'name', 'manager_id'],
+            required: user?.role === 'manager',
+            where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
+          }
+        ],
       });
 
       if (!floor) {
-        const error = new Error('Floor not found');
+        const error = new Error(
+          user?.role === 'manager'
+            ? 'Floor not found or you do not have access to it'
+            : 'Floor not found'
+        );
         error.statusCode = 404;
         throw error;
       }
@@ -457,20 +541,33 @@ class FloorService {
         }))
       };
     } catch (error) {
-      // If columns don't exist, fall back to basic occupancy report
+      // Fallback for missing columns
       if (error.message.includes('column') && error.message.includes('does not exist')) {
         console.warn('Local table missing some columns, using basic occupancy report');
         
         const floor = await Floor.findByPk(id, {
-          include: { 
-            model: Local, 
-            as: 'localsForFloor', 
-            attributes: ['id', 'status'] 
-          },
+          include: [
+            { 
+              model: Local, 
+              as: 'localsForFloor', 
+              attributes: ['id', 'status'] 
+            },
+            {
+              model: Property,
+              as: 'propertyForFloor',
+              attributes: ['id', 'name', 'manager_id'],
+              required: user?.role === 'manager',
+              where: user?.role === 'manager' ? { manager_id: user.id } : undefined,
+            }
+          ],
         });
 
         if (!floor) {
-          const error = new Error('Floor not found');
+          const error = new Error(
+            user?.role === 'manager'
+              ? 'Floor not found or you do not have access to it'
+              : 'Floor not found'
+          );
           error.statusCode = 404;
           throw error;
         }
@@ -509,8 +606,8 @@ class FloorService {
   }
 
   /**
-   * Occupancy report for all floors (with optional property filter) with safe column handling
-   * ✅ FIXED: Returns array directly without wrapper
+   * Occupancy report for all floors (with optional property filter)
+   * ✅ Already has proper manager access control
    */
   async getAllFloorsOccupancy(propertyId = null, user = null) {
     const whereClause = {};
@@ -538,7 +635,6 @@ class FloorService {
         order: [['level_number', 'ASC']],
       });
 
-      // ✅ Return array directly (not wrapped in object)
       return floors.map(floor => {
         const locals = floor.localsForFloor || [];
         const total = locals.length;
@@ -571,7 +667,6 @@ class FloorService {
         };
       });
     } catch (error) {
-      // If columns don't exist, fall back to basic occupancy report
       if (error.message.includes('column') && error.message.includes('does not exist')) {
         console.warn('Local table missing some columns, using basic occupancy report');
         

@@ -6,7 +6,8 @@ const propertyService = require('../services/propertyService');
 // =====================================================
 const handleError = (res, err, defaultMessage, defaultStatus = 500) => {
   console.error('❌ Property Controller Error:', err);
-  const status = err.status || defaultStatus;
+  // ✅ Use statusCode (matches service)
+  const status = err.statusCode || err.status || defaultStatus;
   res.status(status).json({
     success: false,
     message: err.message || defaultMessage,
@@ -79,17 +80,34 @@ exports.deleteProperty = async (req, res) => {
 // =====================================================
 exports.getFloorsByPropertyId = async (req, res) => {
   try {
-    const result = await propertyService.getPropertyById(req.params.id, req.user);
-
-    // Handle missing floors array safely
-    const floors = result?.data?.floorsForProperty || [];
-
-    res.status(200).json({
-      success: true,
-      data: floors,
-    });
+    console.log('🏢 ========================================');
+    console.log('📋 Property Controller: getFloorsByPropertyId');
+    console.log('🏢 ========================================');
+    console.log('  📍 Property ID:', req.params.id);
+    console.log('  👤 User ID:', req.user?.id);
+    console.log('  🔑 User Role:', req.user?.role);
+    console.log('  📧 User Email:', req.user?.email);
+    console.log('  🌐 Request URL:', req.originalUrl);
+    console.log('  📝 Request Method:', req.method);
+    console.log('🏢 ========================================');
+    
+    // ✅ Use the dedicated service method that handles access control
+    const result = await propertyService.getFloorsByPropertyId(req.params.id, req.user);
+    
+    // ✅ Log success summary
+    console.log('✅ Floors fetched successfully:');
+    console.log('  📊 Floors Count:', result.data?.floors?.length || 0);
+    console.log('  🏠 Property Name:', result.data?.property?.name);
+    console.log('  🆔 Property ID:', result.data?.property?.id);
+    
+    res.status(200).json(result);
   } catch (err) {
-    handleError(res, err, 'Failed to fetch floors.');
+    console.error('❌ Failed to fetch floors:');
+    console.error('  📍 Property ID:', req.params.id);
+    console.error('  ⚠️  Error Message:', err.message);
+    console.error('  🔢 Status Code:', err.statusCode);
+    console.error('  📚 Stack:', err.stack);
+    handleError(res, err, 'Failed to fetch floors.', 404);
   }
 };
 
@@ -101,6 +119,13 @@ exports.assignManager = async (req, res) => {
     const { propertyId } = req.params;
     const { manager_id } = req.body;
 
+    console.log('📝 assignManager controller:', {
+      propertyId,
+      managerId: manager_id,
+      requestedBy: req.user.id,
+      role: req.user.role
+    });
+
     if (!manager_id) {
       return res.status(400).json({
         success: false,
@@ -108,7 +133,7 @@ exports.assignManager = async (req, res) => {
       });
     }
 
-    // Only admins can assign/change managers
+    // ✅ Service already checks admin role, but we can add extra safety
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -116,10 +141,26 @@ exports.assignManager = async (req, res) => {
       });
     }
 
-    const result = await propertyService.assignPropertyToManager(propertyId, manager_id);
+    // ✅ Pass propertyId and data object (matches service signature)
+    const result = await propertyService.assignPropertyToManager(
+      propertyId, 
+      { manager_id },
+      req.user
+    );
+    
+    console.log('✅ Manager assigned successfully:', {
+      propertyId,
+      managerId: manager_id,
+      propertyName: result.data?.name
+    });
+    
     res.status(200).json(result);
 
   } catch (err) {
+    console.error('❌ Failed to assign manager:', {
+      propertyId: req.params.propertyId,
+      error: err.message
+    });
     handleError(res, err, 'Failed to assign manager to property.', 400);
   }
 };
