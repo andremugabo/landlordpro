@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Sun, Moon, Bell, LogOut, Settings, User, Menu } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { getUnreadNotifications, markNotificationRead } from '../../services/userService';
+import { getUnreadNotifications, markNotificationRead } from '../../services/UserService';
 import { useNavigate } from 'react-router-dom';
 import defaultAvatar from '../../assets/react.svg';
 

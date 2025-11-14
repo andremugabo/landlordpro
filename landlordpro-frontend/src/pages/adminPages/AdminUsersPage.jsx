@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { getAllUsers, updateUser, disableUser, enableUser, registerUser } from '../../services/userService';
+import { getAllUsers, updateUser, disableUser, enableUser, registerUser } from '../../services/UserService';
 import { Button, Modal, Input, Card } from '../../components';
 import { FiEdit, FiUserPlus, FiEye, FiEyeOff, FiSearch, FiMail, FiUser } from 'react-icons/fi';
 import { showSuccess, showError, showInfo } from '../../utils/toastHelper';

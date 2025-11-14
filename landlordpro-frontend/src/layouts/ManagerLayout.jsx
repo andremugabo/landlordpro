@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar, Topbar } from '../components';
 import { logout, getLoggedInUser, getToken, saveLoggedInUser } from '../services/AuthService';
-import { getProfile } from '../services/userService';
+import { getProfile } from '../services/UserService';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 

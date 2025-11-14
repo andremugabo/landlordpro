@@ -4,7 +4,7 @@ import {
   createProperty, 
   updateProperty 
 } from '../../services/propertyService';
-import { getAllManagers } from '../../services/userService';
+import { getAllManagers } from '../../services/UserService';
 import { Button, Modal, Input, Card, Checkbox } from '../../components';
 import { FiEdit, FiPlus, FiSearch, FiLayers } from 'react-icons/fi';
 import { showSuccess, showError } from '../../utils/toastHelper';

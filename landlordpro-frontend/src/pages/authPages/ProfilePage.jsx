@@ -22,7 +22,7 @@ import {
   FiMapPin
 } from "react-icons/fi";
 import defaultAvatar from "../../assets/react.svg";
-import { getProfile, updateProfile, uploadAvatar, updatePassword } from "../../services/userService";
+import { getProfile, updateProfile, uploadAvatar, updatePassword } from "../../services/UserService";
 import { saveLoggedInUser } from "../../services/AuthService";
 import { showSuccess, showError } from "../../utils/toastHelper";
 import { useNavigate } from "react-router-dom";

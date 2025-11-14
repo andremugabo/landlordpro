@@ -7,7 +7,7 @@ import {
   updateProfile,
   updatePassword,
   uploadAvatar,
-} from '../../services/userService';
+} from '../../services/UserService';
 import { showError, showSuccess } from '../../utils/toastHelper';
 
 const initialPasswordState = {
