@@ -34,7 +34,7 @@ services:
     env_file:
       - ./landlordpro-backend/.env
     volumes:
-      - ./landlordpro-backend/uploads:/app/uploads
+      - backend_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
