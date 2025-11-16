@@ -24,18 +24,20 @@ const allowedOrigins = [
   'http://localhost:80',
   'http://localhost:3000', 
   'http://frontend', 
+  'https://api.landlordpro.rw',
+  'https://landlordpro.rw',
+  'https://www.landlordpro.rw'
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (Postman, curl)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error(`CORS policy: origin ${origin} not allowed`));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true,
-  optionsSuccessStatus: 200, // Fixes preflight issues
+  optionsSuccessStatus: 200,
 }));
 
 // ---------------------
